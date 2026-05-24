@@ -1,16 +1,12 @@
 /**
  * @file components/ui/SkeletonLoader.tsx
- * @description Premium Light shimmer skeleton loader.
- *
- * - Light grey base with shimmer pulse animation
- * - Animated loop using Animated.loop + Animated.timing
- *
- * ✅ All existing props preserved — zero logic changes.
+ * @description NEXTTRP shimmer skeleton.
  */
 
-import React, { useEffect, useRef } from 'react';
+import React from 'react';
 import { Animated, StyleSheet, View } from 'react-native';
 import { Colors } from '../../constants/colors';
+import { useShimmer } from '../../utils/animations';
 
 export interface SkeletonLoaderProps {
   width?: number | string;
@@ -25,30 +21,10 @@ export const SkeletonLoader: React.FC<SkeletonLoaderProps> = ({
   borderRadius = 12,
   style,
 }) => {
-  const shimmer = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    const animation = Animated.loop(
-      Animated.sequence([
-        Animated.timing(shimmer, {
-          toValue: 1,
-          duration: 800,
-          useNativeDriver: true,
-        }),
-        Animated.timing(shimmer, {
-          toValue: 0,
-          duration: 800,
-          useNativeDriver: true,
-        }),
-      ])
-    );
-    animation.start();
-    return () => animation.stop();
-  }, [shimmer]);
-
+  const shimmer = useShimmer();
   const opacity = shimmer.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.5, 1.0],
+    inputRange: [0, 0.5, 1],
+    outputRange: [0.65, 1, 0.65],
   });
 
   return (
@@ -63,12 +39,6 @@ export const SkeletonLoader: React.FC<SkeletonLoaderProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
-  skeleton: {
-    backgroundColor: Colors.backgroundLayer2,
-  },
-});
-
 export function SkeletonRow(): React.ReactElement {
   return (
     <View style={rowStyles.container}>
@@ -82,10 +52,16 @@ export function SkeletonRow(): React.ReactElement {
   );
 }
 
+const styles = StyleSheet.create({
+  skeleton: {
+    backgroundColor: Colors.divider,
+  },
+});
+
 const rowStyles = StyleSheet.create({
   container: {
-    flexDirection: 'row',
     alignItems: 'center',
+    flexDirection: 'row',
     marginBottom: 12,
   },
   lines: {

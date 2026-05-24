@@ -133,8 +133,8 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   circleCompleted: {
-    backgroundColor: Colors.success,
-    borderColor: Colors.success,
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
   },
   circleText: {
     color: Colors.textTertiary,
@@ -158,15 +158,15 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   labelCompleted: {
-    color: Colors.success,
+    color: Colors.primary,
   },
   connector: {
-    backgroundColor: Colors.backgroundLayer2,
+    backgroundColor: Colors.border,
     flex: 1,
     height: 2,
     marginBottom: 18,
   },
   connectorCompleted: {
-    backgroundColor: Colors.success,
+    backgroundColor: Colors.primary,
   },
 });

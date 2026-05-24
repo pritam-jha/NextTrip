@@ -1,5 +1,6 @@
 import { AppError, ERROR_MESSAGES } from '../constants/errors';
-import { supabase } from '../lib/supabase';
+// FIXED: 4 - Public category reads use the clearly named anon client.
+import { supabasePublic } from '../lib/supabase';
 import type { Category } from '../types';
 
 const isRecord = (value: unknown): value is Record<string, unknown> => {
@@ -60,7 +61,7 @@ const mapCategory = (value: unknown): Category => {
  * Fetches active categories ordered for display in the mobile app.
  */
 export const getCategories = async (): Promise<Category[]> => {
-  const { data, error } = await supabase
+  const { data, error } = await supabasePublic
     .from('categories')
     .select('id, name, label, icon, description, is_active, display_order, created_at')
     .eq('is_active', true)

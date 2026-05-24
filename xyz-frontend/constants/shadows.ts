@@ -1,98 +1,89 @@
 /**
  * @file constants/shadows.ts
- * @description Shadow presets for XYZ Premium Light 3D design system.
- * Multi-layer shadows create genuine depth on light backgrounds.
+ * @description NEXTTRP shadow presets.
  */
 
 import type { ViewStyle } from 'react-native';
 
 export const Shadows: Record<string, ViewStyle> = {
-  /**
-   * Premium 3D card shadow — layered depth for floating cards.
-   */
-  glassCard: {
-    shadowColor: '#0F1535',
+  glow: {
+    shadowColor: '#E8631A',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.12,
-    shadowRadius: 24,
-    elevation: 12,
-  },
-
-  /**
-   * Navy brand glow shadow — wrap CTAs and active elements.
-   */
-  neonGlow: {
-    shadowColor: '#2D3FE0',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.40,
-    shadowRadius: 16,
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
     elevation: 10,
   },
-
-  /**
-   * Subtle float shadow — for secondary cards and inputs.
-   */
-  float: {
-    shadowColor: '#0F1535',
+  card: {
+    shadowColor: '#1A1A2E',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.1,
     shadowRadius: 12,
     elevation: 6,
   },
-
-  /**
-   * Hero image depth shadow — for full-bleed images and hero sections.
-   */
-  heroDepth: {
-    shadowColor: '#0F1535',
-    shadowOffset: { width: 0, height: 16 },
-    shadowOpacity: 0.18,
-    shadowRadius: 40,
-    elevation: 20,
+  soft: {
+    shadowColor: '#1A1A2E',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 3,
   },
-
-  /**
-   * Error/danger glow shadow.
-   */
-  errorGlow: {
-    shadowColor: '#E53E3E',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.25,
-    shadowRadius: 12,
-    elevation: 6,
-  },
-
-  /**
-   * Elevated card — strong 3D lift effect.
-   */
-  elevated: {
-    shadowColor: '#0F1535',
+  float: {
+    shadowColor: '#E8631A',
     shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.15,
-    shadowRadius: 32,
-    elevation: 16,
+    shadowOpacity: 0.22,
+    shadowRadius: 24,
+    elevation: 14,
   },
-
-  /**
-   * No shadow — use for flat elements.
-   */
+  blue: {
+    shadowColor: '#0099CC',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
+    elevation: 6,
+  },
   none: {},
 
-  // ── Legacy aliases ────────────────────────────────────────
-  /** @deprecated use glassCard */
-  card: {
-    shadowColor: '#0F1535',
+  // Compatibility aliases.
+  glassCard: {
+    shadowColor: '#1A1A2E',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  neonGlow: {
+    shadowColor: '#E8631A',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  heroDepth: {
+    shadowColor: '#1A1A2E',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.16,
+    shadowRadius: 24,
+    elevation: 14,
+  },
+  errorGlow: {
+    shadowColor: '#EF4444',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  elevated: {
+    shadowColor: '#1A1A2E',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.12,
-    shadowRadius: 24,
-    elevation: 12,
+    shadowRadius: 20,
+    elevation: 10,
   },
-  /** @deprecated use neonGlow */
   cardHover: {
-    shadowColor: '#2D3FE0',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.40,
-    shadowRadius: 16,
+    shadowColor: '#E8631A',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
     elevation: 10,
   },
 } as const;

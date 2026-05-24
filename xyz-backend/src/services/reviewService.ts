@@ -9,7 +9,8 @@
  */
 
 import { AppError, ERROR_MESSAGES } from '../constants/errors';
-import { supabase } from '../lib/supabase';
+// FIXED: 4 - Review publishing uses the explicitly named backend service-role client.
+import { supabaseAdmin } from '../lib/supabase';
 import type {
   CreateReviewInput,
   PaginatedResponse,
@@ -83,13 +84,14 @@ const throwDatabaseError = (operation: string, dbError: unknown): never => {
 // ── Mapper ────────────────────────────────────────────────────────────────────
 
 /**
- * Maps a raw Supabase row (with joined profile data) to a typed Review.
+ * Maps a raw Supabase row (with joined user data) to a typed Review.
  */
 const mapReview = (record: Record<string, unknown>): Review => {
-  const profileRaw = toRecord(record['profile']);
+  // FIXED: 3 - Reviews join public.users; keep the mapper aligned with that table.
+  const userRaw = toRecord(record['user']);
 
   // Build display_name: "First L." format for privacy
-  const fullName = readString(profileRaw, 'full_name').trim();
+  const fullName = readString(userRaw, 'full_name').trim();
   let displayName = 'Anonymous';
   if (fullName.length > 0) {
     const parts = fullName.split(' ').filter(Boolean);
@@ -118,7 +120,7 @@ const mapReview = (record: Record<string, unknown>): Review => {
     created_at: readString(record, 'created_at'),
     user: {
       display_name: displayName,
-      avatar_url: readNullableString(profileRaw, 'avatar_url'),
+      avatar_url: readNullableString(userRaw, 'avatar_url'),
     },
   };
 };
@@ -152,7 +154,7 @@ export async function createReview(
   }
 
   // ── Guard: booking ownership + completed status ───────────────────────────
-  const { data: bookingData, error: bookingError } = await supabase
+  const { data: bookingData, error: bookingError } = await supabaseAdmin
     .from('bookings')
     .select('id, user_id, package_id, status')
     .eq('id', input.booking_id)
@@ -179,7 +181,7 @@ export async function createReview(
   }
 
   // ── Guard: no duplicate review for this booking ───────────────────────────
-  const { data: existingReview, error: existingError } = await supabase
+  const { data: existingReview, error: existingError } = await supabaseAdmin
     .from('reviews')
     .select('id')
     .eq('booking_id', input.booking_id)
@@ -193,7 +195,7 @@ export async function createReview(
   }
 
   // ── Insert review ─────────────────────────────────────────────────────────
-  const { data: insertedData, error: insertError } = await supabase
+  const { data: insertedData, error: insertError } = await supabaseAdmin
     .from('reviews')
     .insert({
       booking_id: input.booking_id,
@@ -211,10 +213,11 @@ export async function createReview(
       // Phase 2: publish immediately; Phase 3 will add admin moderation
       is_published: true,
     })
+    // FIXED: 3 - Join public.users instead of the non-existent profiles table.
     .select(
       `
       *,
-      profile:profiles(full_name, avatar_url)
+      user:users(full_name, avatar_url)
     `
     )
     .single();
@@ -245,12 +248,13 @@ export async function getPackageReviews(
   const from = (page - 1) * limit;
   const to = from + limit - 1;
 
-  const { data, error: fetchError, count } = await supabase
+  const { data, error: fetchError, count } = await supabaseAdmin
     .from('reviews')
+    // FIXED: 3 - Join public.users, not the non-existent profiles table.
     .select(
       `
       *,
-      profile:profiles(full_name, avatar_url)
+      user:users(full_name, avatar_url)
     `,
       { count: 'exact' }
     )
@@ -285,7 +289,7 @@ export async function getReviewEligibility(
   packageId: string
 ): Promise<ReviewEligibility> {
   // Find a completed booking for this user + package
-  const { data: bookingData, error: bookingError } = await supabase
+  const { data: bookingData, error: bookingError } = await supabaseAdmin
     .from('bookings')
     .select('id')
     .eq('user_id', userId)
@@ -305,7 +309,7 @@ export async function getReviewEligibility(
   const bookingId = readString(toRecord(bookingData), 'id');
 
   // Check if a review already exists for this booking
-  const { data: existingReview, error: reviewError } = await supabase
+  const { data: existingReview, error: reviewError } = await supabaseAdmin
     .from('reviews')
     .select('id')
     .eq('booking_id', bookingId)

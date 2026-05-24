@@ -1,5 +1,6 @@
 import { AppError, ERROR_MESSAGES } from '../constants/errors';
-import { supabase } from '../lib/supabase';
+// FIXED: 4 - Public package discovery uses the clearly named anon client.
+import { supabasePublic } from '../lib/supabase';
 import type {
   Badge,
   Category,
@@ -25,7 +26,7 @@ const PACKAGE_LIST_SELECT = `
 
 const PACKAGE_DETAIL_SELECT = `
   *,
-  company:companies(id, name, slug, logo_url, is_verified, avg_rating, total_reviews),
+  company:companies(id, name, slug, logo_url, is_verified, avg_rating, total_reviews, owner_id),
   location:locations(id, city, state, region),
   category:categories(id, name, label, icon)
 `;
@@ -192,6 +193,7 @@ const mapDetailCompany = (value: unknown): PackageDetail['company'] => {
     is_verified: readBoolean(record, 'is_verified'),
     avg_rating: readNumber(record, 'avg_rating'),
     total_reviews: readNumber(record, 'total_reviews'),
+    owner_id: readString(record, 'owner_id'),
   };
 };
 
@@ -299,7 +301,7 @@ const fetchCoverImages = async (packageIds: string[]): Promise<Map<string, strin
     return coverImages;
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await supabasePublic
     .from('package_images')
     .select('package_id, url, display_order')
     .in('package_id', packageIds)
@@ -332,7 +334,7 @@ const fetchListPricing = async (packageIds: string[], mode: PricingMode): Promis
     return pricingByPackage;
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await supabasePublic
     .from('package_pricing')
     .select('package_id, base_price, discounted_price, currency')
     .in('package_id', packageIds)
@@ -387,7 +389,7 @@ const resolveCategoryIdsByName = async (categoryName: string | undefined): Promi
     return null;
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await supabasePublic
     .from('categories')
     .select('id')
     .eq('is_active', true)
@@ -409,7 +411,7 @@ const resolveLocationIdsByState = async (state: string | undefined): Promise<str
     return null;
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await supabasePublic
     .from('locations')
     .select('id')
     .eq('is_active', true)
@@ -434,7 +436,7 @@ const resolvePackageIdsByPrice = async (
     return null;
   }
 
-  let query = supabase.from('package_pricing').select('package_id').eq('is_active', true);
+  let query = supabasePublic.from('package_pricing').select('package_id').eq('is_active', true);
 
   if (minPrice !== undefined) {
     query = query.or(`discounted_price.gte.${minPrice},and(discounted_price.is.null,base_price.gte.${minPrice})`);
@@ -480,7 +482,7 @@ export const searchPackages = async (filters: SearchFilters): Promise<PaginatedR
     return emptyPaginatedResponse<PackageListItem>(page, limit);
   }
 
-  let query = supabase
+  let query = supabasePublic
     .from('packages')
     .select(PACKAGE_LIST_SELECT, { count: 'exact' })
     .eq('status', 'active');
@@ -554,7 +556,7 @@ export const getPackageListItemsByIds = async (
     return [];
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await supabasePublic
     .from('packages')
     .select(PACKAGE_LIST_SELECT)
     .in('id', uniqueIds)
@@ -574,7 +576,7 @@ export const getPackageListItemsByIds = async (
  * Fetches a single active package with gallery, itinerary, pricing, company, location, and category details.
  */
 export const getPackageById = async (id: string): Promise<PackageDetail> => {
-  const { data, error } = await supabase
+  const { data, error } = await supabasePublic
     .from('packages')
     .select(PACKAGE_DETAIL_SELECT)
     .eq('id', id)
@@ -590,17 +592,17 @@ export const getPackageById = async (id: string): Promise<PackageDetail> => {
   }
 
   const [imagesResult, itinerariesResult, pricingResult] = await Promise.all([
-    supabase
+    supabasePublic
       .from('package_images')
       .select('id, package_id, url, public_id, alt_text, is_cover, display_order')
       .eq('package_id', id)
       .order('display_order', { ascending: true }),
-    supabase
+    supabasePublic
       .from('itineraries')
       .select('id, package_id, day_number, title, description, meals, accommodation, activities, transport')
       .eq('package_id', id)
       .order('day_number', { ascending: true }),
-    supabase
+    supabasePublic
       .from('package_pricing')
       .select(
         'id, package_id, label, min_people, max_people, base_price, discounted_price, currency, season, valid_from, valid_until, is_active',
@@ -648,7 +650,7 @@ export const getPackagesForCompare = async (ids: string[]): Promise<PackageListI
  * Fetches featured active packages ordered by rating for the home screen.
  */
 export const getFeaturedPackages = async (): Promise<PackageListItem[]> => {
-  const { data, error } = await supabase
+  const { data, error } = await supabasePublic
     .from('packages')
     .select(PACKAGE_LIST_SELECT)
     .eq('status', 'active')

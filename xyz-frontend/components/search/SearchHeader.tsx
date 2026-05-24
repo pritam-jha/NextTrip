@@ -1,22 +1,15 @@
 /**
  * @file components/search/SearchHeader.tsx
- * @description Search input row with back button, mic icon, and filter badge.
+ * @description NEXTTRP search input row.
  */
 
-import React, { useCallback, useRef } from 'react';
-import {
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import React, { useCallback, useRef, useState } from 'react';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 
 import { Colors } from '../../constants/colors';
-
-// ── Props ─────────────────────────────────────────────────────────────────────
+import { Shadows } from '../../constants/shadows';
 
 export interface SearchHeaderProps {
   value: string;
@@ -24,11 +17,15 @@ export interface SearchHeaderProps {
   onSubmit: () => void;
   onFilterPress: () => void;
   activeFilterCount: number;
-  /** Whether the screen was pushed from another screen (shows back button) */
   canGoBack?: boolean;
 }
 
-// ── Component ─────────────────────────────────────────────────────────────────
+const HIT_SLOP = {
+  bottom: 8,
+  left: 8,
+  right: 8,
+  top: 8,
+};
 
 export function SearchHeader({
   value,
@@ -39,6 +36,7 @@ export function SearchHeader({
   canGoBack = false,
 }: SearchHeaderProps): React.ReactElement {
   const inputRef = useRef<TextInput>(null);
+  const [focused, setFocused] = useState(false);
 
   const handleClear = useCallback(() => {
     onChangeText('');
@@ -46,81 +44,56 @@ export function SearchHeader({
   }, [onChangeText]);
 
   const handleBack = useCallback(() => {
-    if (router.canGoBack()) {
-      router.back();
-    }
+    if (router.canGoBack()) router.back();
   }, []);
 
   return (
     <View style={styles.container}>
-      {/* Back button */}
-      {canGoBack && (
+      {canGoBack ? (
         <Pressable
           style={styles.iconButton}
           onPress={handleBack}
           accessibilityRole="button"
           accessibilityLabel="Go back"
-          hitSlop={8}
+          hitSlop={HIT_SLOP}
         >
-          <Ionicons
-            name="arrow-back"
-            size={22}
-            color={Colors.textPrimary}
-          />
+          <Ionicons name="arrow-back" size={22} color={Colors.navy} />
         </Pressable>
-      )}
+      ) : null}
 
-      {/* Search input */}
-      <View style={styles.inputWrap}>
-        <Ionicons
-          name="search-outline"
-          size={18}
-          color={Colors.textTertiary}
-          style={styles.searchIcon}
-        />
-
+      <View style={[styles.inputWrap, focused && styles.inputWrapFocused]}>
+        <Ionicons name="search-outline" size={18} color={Colors.primary} style={styles.searchIcon} />
         <TextInput
           ref={inputRef}
           style={styles.input}
           value={value}
           onChangeText={onChangeText}
           onSubmitEditing={onSubmit}
-          placeholder="Search destinations, packages…"
-          placeholderTextColor={Colors.textTertiary}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          placeholder="Search destinations, packages..."
+          placeholderTextColor={Colors.textLight}
           returnKeyType="search"
           autoCapitalize="words"
           autoCorrect={false}
           accessibilityLabel="Search destination"
         />
-
-        {/* Clear button */}
-        {value.length > 0 && (
+        {value.length > 0 ? (
           <Pressable
             style={styles.clearButton}
             onPress={handleClear}
             accessibilityRole="button"
             accessibilityLabel="Clear search"
-            hitSlop={8}
+            hitSlop={HIT_SLOP}
           >
-            <Ionicons name="close-circle" size={18} color={Colors.textTertiary} />
+            <Ionicons name="close-circle" size={18} color={Colors.textLight} />
           </Pressable>
-        )}
-
-        {/* Mic icon — UI only, no functionality in Phase 1 */}
-        {value.length === 0 && (
-          <View style={styles.micButton} accessibilityElementsHidden>
-            <Ionicons
-              name="mic-outline"
-              size={18}
-              color={Colors.textTertiary}
-            />
-          </View>
-        )}
+        ) : null}
+        {focused ? <View style={styles.focusDot} /> : null}
       </View>
 
-      {/* Filter button */}
       <Pressable
-        style={styles.filterButton}
+        style={[styles.filterButton, Shadows.soft]}
         onPress={onFilterPress}
         accessibilityRole="button"
         accessibilityLabel={
@@ -128,33 +101,29 @@ export function SearchHeader({
             ? `Filters, ${activeFilterCount} active`
             : 'Open filters'
         }
-        hitSlop={8}
+        hitSlop={HIT_SLOP}
       >
         <Ionicons
           name="options-outline"
           size={20}
-          color={activeFilterCount > 0 ? Colors.primary : Colors.textPrimary}
+          color={activeFilterCount > 0 ? Colors.primary : Colors.navy}
         />
-        {activeFilterCount > 0 && (
+        {activeFilterCount > 0 ? (
           <View style={styles.badge}>
             <Text style={styles.badgeText} numberOfLines={1}>
               {activeFilterCount > 9 ? '9+' : String(activeFilterCount)}
             </Text>
           </View>
-        )}
+        ) : null}
       </Pressable>
     </View>
   );
 }
 
-// ── Styles ────────────────────────────────────────────────────────────────────
-
 const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
     flexDirection: 'row',
-    paddingBottom: 10,
-    paddingTop: 14,
   },
   iconButton: {
     alignItems: 'center',
@@ -165,25 +134,23 @@ const styles = StyleSheet.create({
   },
   inputWrap: {
     alignItems: 'center',
-    backgroundColor: Colors.surfacePrimary,
-    borderColor: Colors.surfaceBorderStrong,
+    backgroundColor: Colors.backgroundWhite,
+    borderColor: Colors.border,
     borderRadius: 14,
     borderWidth: 1.5,
     flex: 1,
     flexDirection: 'row',
     minHeight: 48,
     paddingHorizontal: 12,
-    shadowColor: '#0F1535',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.07,
-    shadowRadius: 10,
-    elevation: 4,
+  },
+  inputWrapFocused: {
+    borderColor: Colors.primary,
   },
   searchIcon: {
     marginRight: 6,
   },
   input: {
-    color: Colors.textPrimary,
+    color: Colors.navy,
     flex: 1,
     fontSize: 15,
     fontWeight: '500',
@@ -196,16 +163,17 @@ const styles = StyleSheet.create({
     marginLeft: 6,
     padding: 2,
   },
-  micButton: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: 6,
-    padding: 2,
+  focusDot: {
+    backgroundColor: Colors.primary,
+    borderRadius: 3,
+    height: 6,
+    marginLeft: 8,
+    width: 6,
   },
   filterButton: {
     alignItems: 'center',
-    backgroundColor: Colors.surfacePrimary,
-    borderColor: Colors.surfaceBorderStrong,
+    backgroundColor: Colors.backgroundWhite,
+    borderColor: Colors.border,
     borderRadius: 14,
     borderWidth: 1.5,
     height: 48,
@@ -213,16 +181,11 @@ const styles = StyleSheet.create({
     marginLeft: 10,
     position: 'relative',
     width: 48,
-    shadowColor: '#0F1535',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.07,
-    shadowRadius: 10,
-    elevation: 4,
   },
   badge: {
     alignItems: 'center',
     backgroundColor: Colors.primary,
-    borderColor: Colors.backgroundBase,
+    borderColor: Colors.background,
     borderRadius: 9,
     borderWidth: 2,
     height: 18,
@@ -234,7 +197,7 @@ const styles = StyleSheet.create({
     top: -5,
   },
   badgeText: {
-    color: Colors.white,
+    color: Colors.textWhite,
     fontSize: 10,
     fontWeight: '700',
     lineHeight: 12,

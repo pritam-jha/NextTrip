@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "XYZ",
-    "slug": "xyz-travel",
+    "name": "NEXTTRP",
+    "slug": "nexttrp-app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -10,25 +10,25 @@
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#F8F7F4"
+      "backgroundColor": "#FFF8F0"
     },
     "assetBundlePatterns": [
       "**/*"
     ],
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.yourname.xyztravel",
+      "bundleIdentifier": "com.yourname.nexttrp",
       "infoPlist": {
-        "NSPhotoLibraryUsageDescription": "XYZ needs access to your photo library to upload profile pictures and package images.",
-        "NSCameraUsageDescription": "XYZ needs access to your camera to take profile pictures."
+        "NSPhotoLibraryUsageDescription": "NEXTTRP needs access to your photo library to upload profile pictures and package images.",
+        "NSCameraUsageDescription": "NEXTTRP needs access to your camera to take profile pictures."
       }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#F8F7F4"
+        "backgroundColor": "#FFF8F0"
       },
-      "package": "com.yourname.xyztravel",
+      "package": "com.yourname.nexttrp",
       "permissions": [
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.WRITE_EXTERNAL_STORAGE",
@@ -48,11 +48,11 @@
           "image": "./assets/splash.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#F8F7F4"
+          "backgroundColor": "#FFF8F0"
         }
       ]
     ],
-    "scheme": "xyzapp",
+    "scheme": "nexttrp",
     "experiments": {
       "typedRoutes": true
     },

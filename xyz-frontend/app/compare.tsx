@@ -7,7 +7,6 @@
 import React, {
   useCallback,
   useEffect,
-  useMemo,
   useRef,
   useState,
 } from 'react';
@@ -41,12 +40,6 @@ import type { PackageListItem } from '../types';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const fmt = new Intl.NumberFormat('en-IN', {
-  currency: 'INR',
-  maximumFractionDigits: 0,
-  style: 'currency',
-}).format;
-
 const ROW_HEIGHTS = {
   awards: 88,
   price: 100,
@@ -74,11 +67,11 @@ function useShimmer(): Animated.Value {
   return opacity;
 }
 
-function Skel({ h, w = '100%' }: { h: number; w?: number | string }): React.ReactElement {
+function Skel({ h, w = '100%' }: { h: number; w?: string | number }): React.ReactElement {
   const opacity = useShimmer();
   return (
     <Animated.View
-      style={[skSt.block, { height: h, width: w, opacity }]}
+      style={[skSt.block, { height: h, width: w as number, opacity }]}
       accessibilityElementsHidden
     />
   );
@@ -324,11 +317,10 @@ export default function CompareScreen(): React.ReactElement {
   const {
     packages,
     isLoading,
-    badges,
-    toast,
-    hideToast,
-    handleEnquire,
   } = useCompareScreen();
+
+  const [toastVisible, setToastVisible] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
 
   const amenitiesData = useAmenitiesData(packages);
   const headerScrollRef = useRef<SV>(null);
@@ -359,6 +351,13 @@ export default function CompareScreen(): React.ReactElement {
     setTimeout(() => { isSyncingV.current = false; }, 50);
   }, []);
 
+  const handleEnquire = useCallback(() => {
+    setToastMessage('Enquiry feature coming soon.');
+    setToastVisible(true);
+  }, []);
+
+  const hideToast = useCallback(() => setToastVisible(false), []);
+
   if (compareItems.length === 0) {
     return (
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
@@ -374,7 +373,7 @@ export default function CompareScreen(): React.ReactElement {
           <Text style={styles.headerTitle}>Compare</Text>
           <View style={styles.headerRight} />
         </View>
-        <EmptyCompare />
+        <EmptyCompare compareItems={compareItems} />
       </SafeAreaView>
     );
   }
@@ -425,7 +424,7 @@ export default function CompareScreen(): React.ReactElement {
         style={styles.stickyHeader}
       >
         <View style={{ width: LABEL_WIDTH }} />
-        <CompareHeader packages={packages} badges={badges} />
+        <CompareHeader packages={packages} canAddMore={false} scrollRef={headerScrollRef} onScroll={(x) => syncHorizontal(x, 'header')} onRemove={() => {}} />
       </ScrollView>
 
       {/* ── Body ── */}
@@ -448,7 +447,7 @@ export default function CompareScreen(): React.ReactElement {
           <RowLabel label="Inclusions" height={ROW_HEIGHTS.standard} />
           <RowLabel label="Highlights" height={ROW_HEIGHTS.highlights} />
           {amenitiesData.map((a) => (
-            <RowLabel key={a.name} label={a.name} height={ROW_HEIGHTS.amenity} />
+            <RowLabel key={a.amenity} label={a.amenity} height={ROW_HEIGHTS.amenity} />
           ))}
           <RowLabel label="Actions" height={ROW_HEIGHTS.actions} />
         </ScrollView>
@@ -469,41 +468,45 @@ export default function CompareScreen(): React.ReactElement {
             scrollEventThrottle={16}
             onScroll={(e) => syncVertical(e.nativeEvent.contentOffset.y, 'body')}
           >
-            <BadgeCells packages={packages} badges={badges} rowHeight={ROW_HEIGHTS.awards} />
-            <PriceCells packages={packages} badges={badges} rowHeight={ROW_HEIGHTS.price} />
-            <RatingCells packages={packages} badges={badges} rowHeight={ROW_HEIGHTS.rating} />
+            <BadgeCells packages={packages} />
+            <PriceCells packages={packages} />
+            <RatingCells packages={packages} />
 
             {/* Duration */}
-            <CompareRowCells rowHeight={ROW_HEIGHTS.standard}>
-              {packages.map((pkg) => (
+            <CompareRowCells
+              cells={packages.map((pkg) => (
                 <TxtCell key={pkg.id} text={`${pkg.duration_days}D / ${pkg.duration_nights}N`} />
               ))}
-            </CompareRowCells>
+              minHeight={ROW_HEIGHTS.standard}
+            />
 
             {/* Category */}
-            <CompareRowCells rowHeight={ROW_HEIGHTS.standard}>
-              {packages.map((pkg) => (
+            <CompareRowCells
+              cells={packages.map((pkg) => (
                 <CategoryCell key={pkg.id} pkg={pkg} />
               ))}
-            </CompareRowCells>
+              minHeight={ROW_HEIGHTS.standard}
+            />
 
             {/* Company */}
-            <CompareRowCells rowHeight={ROW_HEIGHTS.standard}>
-              {packages.map((pkg) => (
+            <CompareRowCells
+              cells={packages.map((pkg) => (
                 <CompanyCell key={pkg.id} pkg={pkg} />
               ))}
-            </CompareRowCells>
+              minHeight={ROW_HEIGHTS.standard}
+            />
 
             {/* Group size */}
-            <CompareRowCells rowHeight={ROW_HEIGHTS.standard}>
-              {packages.map((pkg) => (
+            <CompareRowCells
+              cells={packages.map((pkg) => (
                 <TxtCell key={pkg.id} text={`${pkg.min_group_size}–${pkg.max_group_size} pax`} />
               ))}
-            </CompareRowCells>
+              minHeight={ROW_HEIGHTS.standard}
+            />
 
             {/* Inclusions */}
-            <CompareRowCells rowHeight={ROW_HEIGHTS.standard}>
-              {packages.map((pkg) => {
+            <CompareRowCells
+              cells={packages.map((pkg) => {
                 const maxInclusions = Math.max(...packages.map((p) => p.inclusions.length));
                 return (
                   <InclusionsCell
@@ -513,26 +516,18 @@ export default function CompareScreen(): React.ReactElement {
                   />
                 );
               })}
-            </CompareRowCells>
+              minHeight={ROW_HEIGHTS.standard}
+            />
 
             {/* Highlights */}
-            <CompareRowCells rowHeight={ROW_HEIGHTS.highlights}>
-              <HighlightsCells packages={packages} />
-            </CompareRowCells>
+            <CompareRowCells
+              cells={[<HighlightsCells key="highlights" packages={packages} />]}
+              minHeight={ROW_HEIGHTS.highlights}
+            />
 
-            {/* Amenities */}
+            {/* Amenities — use pre-computed cells from useAmenitiesData */}
             {amenitiesData.map((a) => (
-              <CompareRowCells key={a.name} rowHeight={ROW_HEIGHTS.amenity}>
-                {packages.map((pkg) => (
-                  <View key={pkg.id} style={amenStyles.cell}>
-                    <Ionicons
-                      name={pkg.amenities.includes(a.name) ? 'checkmark-circle' : 'close-circle-outline'}
-                      size={20}
-                      color={pkg.amenities.includes(a.name) ? Colors.success : Colors.surfaceBorder}
-                    />
-                  </View>
-                ))}
-              </CompareRowCells>
+              <View key={a.amenity}>{a.cells}</View>
             ))}
 
             {/* Actions */}
@@ -542,22 +537,14 @@ export default function CompareScreen(): React.ReactElement {
       </View>
 
       <Toast
-        visible={toast.visible}
-        message={toast.message}
-        type={toast.type as 'success' | 'error' | 'info'}
+        visible={toastVisible}
+        message={toastMessage}
+        type="info"
         onHide={hideToast}
       />
     </SafeAreaView>
   );
 }
-
-const amenStyles = StyleSheet.create({
-  cell: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    flex: 1,
-  },
-});
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 

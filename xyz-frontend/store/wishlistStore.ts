@@ -12,7 +12,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { WishlistState } from '../types';
+import type { Location, WishlistState } from '../types';
 
 /**
  * Serialisable shape used for AsyncStorage persistence.
@@ -21,6 +21,8 @@ import type { WishlistState } from '../types';
  */
 interface PersistedWishlistState {
   wishlistedIdsArray: string[];
+  wishlistedDestinationIdsArray?: string[];
+  wishlistedDestinations?: Location[];
 }
 
 /**
@@ -33,6 +35,8 @@ export const useWishlistStore = create<WishlistState>()(
   persist(
     (set, get) => ({
       wishlistedIds: new Set<string>(),
+      wishlistedDestinationIds: new Set<string>(),
+      wishlistedDestinations: [],
 
       /**
        * Adds a package ID to the local wishlist cache.
@@ -55,6 +59,53 @@ export const useWishlistStore = create<WishlistState>()(
         }),
 
       /**
+       * Adds a destination to the local wishlist cache.
+       * Destination wishlists are local because the backend wishlist table is
+       * package-based.
+       */
+      addDestinationToWishlist: (destination: Location) =>
+        set((state) => ({
+          wishlistedDestinationIds: new Set([
+            ...state.wishlistedDestinationIds,
+            destination.id,
+          ]),
+          wishlistedDestinations: [
+            destination,
+            ...state.wishlistedDestinations.filter(
+              (item) => item.id !== destination.id
+            ),
+          ],
+        })),
+
+      /**
+       * Removes a destination from the local wishlist cache.
+       */
+      removeDestinationFromWishlist: (destinationId: string) =>
+        set((state) => {
+          const next = new Set(state.wishlistedDestinationIds);
+          next.delete(destinationId);
+
+          return {
+            wishlistedDestinationIds: next,
+            wishlistedDestinations: state.wishlistedDestinations.filter(
+              (destination) => destination.id !== destinationId
+            ),
+          };
+        }),
+
+      /**
+       * Toggles a destination in the local wishlist cache.
+       */
+      toggleDestinationWishlist: (destination: Location) => {
+        if (get().wishlistedDestinationIds.has(destination.id)) {
+          get().removeDestinationFromWishlist(destination.id);
+          return;
+        }
+
+        get().addDestinationToWishlist(destination);
+      },
+
+      /**
        * Replaces the entire wishlist cache with a fresh array of IDs.
        * Called on app startup after fetching wishlist IDs from Supabase.
        */
@@ -66,9 +117,15 @@ export const useWishlistStore = create<WishlistState>()(
        * O(1) lookup via Set.
        */
       isWishlisted: (packageId: string) => get().wishlistedIds.has(packageId),
+
+      /**
+       * Returns true if the given destination ID is in the local wishlist cache.
+       */
+      isDestinationWishlisted: (destinationId: string) =>
+        get().wishlistedDestinationIds.has(destinationId),
     }),
     {
-      name: 'xyz-wishlist-storage',
+      name: 'nexttrp-wishlist-storage',
       storage: createJSONStorage(() => AsyncStorage),
       /**
        * Custom serialiser: converts Set → Array before writing to AsyncStorage.
@@ -76,12 +133,21 @@ export const useWishlistStore = create<WishlistState>()(
        */
       partialize: (state) => ({
         wishlistedIdsArray: [...state.wishlistedIds],
+        wishlistedDestinationIdsArray: [...state.wishlistedDestinationIds],
+        wishlistedDestinations: state.wishlistedDestinations,
       }),
       merge: (persistedState, currentState) => {
-        const persisted = persistedState as PersistedWishlistState;
+        const persisted = (persistedState ?? {}) as PersistedWishlistState;
+        const destinations = persisted.wishlistedDestinations ?? [];
+        const destinationIds =
+          persisted.wishlistedDestinationIdsArray ??
+          destinations.map((destination) => destination.id);
+
         return {
           ...currentState,
           wishlistedIds: new Set(persisted.wishlistedIdsArray ?? []),
+          wishlistedDestinationIds: new Set(destinationIds),
+          wishlistedDestinations: destinations,
         };
       },
     }

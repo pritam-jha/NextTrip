@@ -1,299 +1,599 @@
 /**
  * @file app/(tabs)/index.tsx
- * @description Home screen — Premium Light 3D design.
- * Warm white background, deep navy headings, gold accents, 3D card depth.
- * All hooks, stores, and API calls preserved.
+ * @description NEXTTRP home screen.
  */
 
 import React, { useCallback, useMemo, useState } from 'react';
 import {
+  Animated,
+  Dimensions,
+  FlatList,
+  Image,
+  Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
   View,
-  Pressable,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import type { GestureResponderEvent, ListRenderItem } from 'react-native';
 
-import { CategoryRow } from '../../components/home/CategoryRow';
-import { FeaturedPackages } from '../../components/home/FeaturedPackages';
-import { PopularLocations } from '../../components/home/PopularLocations';
+import { Chip } from '../../components/ui/Chip';
+import { PackageCard } from '../../components/home/PackageCard';
+import { SkeletonLoader } from '../../components/ui/SkeletonLoader';
 import {
   useCategories,
   useFeaturedPackages,
   useLocations,
 } from '../../hooks/useHomeData';
-import { useAuth } from '../../hooks/useAuth';
-import { useUnreadCount } from '../../hooks/useNotifications';
 import { useWishlistIds } from '../../hooks/useWishlist';
+import { useWishlistStore } from '../../store/wishlistStore';
 import { Colors } from '../../constants/colors';
-import { Config } from '../../constants/config';
+import { Shadows } from '../../constants/shadows';
+import { use3DCard, useHeartBounce, useSlideUp } from '../../utils/animations';
+import type { Location, PackageListItem } from '../../types';
+
+const SCREEN_WIDTH = Dimensions.get('window').width;
+const PACKAGE_CARD_WIDTH = Math.round(SCREEN_WIDTH * 0.76);
+const PACKAGE_CARD_GAP = 16;
+const DESTINATION_CARD_WIDTH = 155;
+const DESTINATION_CARD_HEIGHT = 215;
+
+const CATEGORY_PILLS = [
+  'All',
+  'Pilgrimage',
+  'Adventure',
+  'Leisure',
+  'Honeymoon',
+  'Family',
+  'Wildlife',
+];
+
+interface DestinationImageRule {
+  keywords: string[];
+  url: string;
+}
+
+const DEFAULT_DESTINATION_IMAGE =
+  'https://images.unsplash.com/photo-1532664189809-02133fee698d?auto=format&fit=crop&w=600&q=80';
+
+const DESTINATION_IMAGE_RULES: DestinationImageRule[] = [
+  {
+    keywords: ['srinagar', 'dal lake', 'kashmir'],
+    url: 'https://images.unsplash.com/photo-1768147765107-5eef8e032a62?auto=format&fit=crop&w=600&q=80',
+  },
+  {
+    keywords: ['alleppey', 'alappuzha', 'kerala', 'backwater', 'backwaters', 'kumarakom'],
+    url: 'https://images.unsplash.com/photo-1707893013488-51672ef83425?auto=format&fit=crop&w=600&q=80',
+  },
+  {
+    keywords: ['leh', 'ladakh', 'pangong', 'nubra'],
+    url: 'https://images.unsplash.com/photo-1673947692587-d39df79fa52c?auto=format&fit=crop&w=600&q=80',
+  },
+  {
+    keywords: ['goa', 'baga', 'calangute', 'anjuna'],
+    url: 'https://images.unsplash.com/photo-1757702244726-00198554c4a0?auto=format&fit=crop&w=600&q=80',
+  },
+  {
+    keywords: ['jaipur', 'rajasthan', 'udaipur', 'jodhpur', 'jaisalmer', 'pushkar', 'amber', 'hawa mahal'],
+    url: 'https://images.unsplash.com/photo-1743399112594-0843ea59e995?auto=format&fit=crop&w=600&q=80',
+  },
+  {
+    keywords: ['mumbai', 'bombay', 'gateway of india', 'marine drive'],
+    url: 'https://images.unsplash.com/photo-1720151722527-706786f70a01?auto=format&fit=crop&w=600&q=80',
+  },
+  {
+    keywords: ['agra', 'taj mahal'],
+    url: 'https://images.unsplash.com/photo-1524492412937-b28074a5d7da?auto=format&fit=crop&w=600&q=80',
+  },
+  {
+    keywords: ['delhi', 'new delhi', 'india gate'],
+    url: 'https://images.unsplash.com/photo-1587474260584-136574528ed5?auto=format&fit=crop&w=600&q=80',
+  },
+  {
+    keywords: ['manali', 'himachal', 'shimla', 'spiti'],
+    url: 'https://images.unsplash.com/photo-1722915767859-08a59870d70b?auto=format&fit=crop&w=600&q=80',
+  },
+];
+
+function normalizeDestinationText(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9\s]/g, ' ');
+}
+
+function getDestinationImage(location: Location): string {
+  const searchable = normalizeDestinationText(`${location.city} ${location.state} ${location.region}`);
+  const match = DESTINATION_IMAGE_RULES.find((rule) =>
+    rule.keywords.some((keyword) => searchable.includes(keyword))
+  );
+
+  return match?.url ?? DEFAULT_DESTINATION_IMAGE;
+}
+
+function HomeSectionHeader({
+  title,
+  onSeeAll,
+}: {
+  title: string;
+  onSeeAll: () => void;
+}): React.ReactElement {
+  return (
+    <View style={styles.sectionHeader}>
+      <Text style={styles.sectionTitle}>{title}</Text>
+      <Pressable onPress={onSeeAll} accessibilityRole="button" accessibilityLabel={`See all ${title}`}>
+        <Text style={styles.seeAll}>See all</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+function DestinationCard({
+  item,
+  liked,
+  onPress,
+  onToggleLike,
+}: {
+  item: Location;
+  liked: boolean;
+  onPress: (location: Location) => void;
+  onToggleLike: (location: Location) => void;
+}): React.ReactElement {
+  const card3D = use3DCard();
+  const heart = useHeartBounce();
+
+  const handleToggleLike = useCallback((event: GestureResponderEvent) => {
+    event.stopPropagation();
+    heart.trigger();
+    onToggleLike(item);
+  }, [heart, item, onToggleLike]);
+
+  return (
+    <Animated.View style={card3D.animatedStyle}>
+      <Pressable
+        style={[styles.destinationCard, Shadows.card]}
+        onPress={() => onPress(item)}
+        onPressIn={card3D.onPressIn}
+        onPressOut={card3D.onPressOut}
+        accessibilityRole="button"
+        accessibilityLabel={`Explore ${item.city}`}
+      >
+        <Image
+          source={{ uri: getDestinationImage(item) }}
+          style={styles.destinationImage}
+          resizeMode="cover"
+          accessibilityLabel={`${item.city} destination`}
+        />
+        <View style={styles.destinationOverlay} pointerEvents="none" />
+        <View style={styles.destinationBadge}>
+          <Text style={styles.destinationBadgeText}>Popular</Text>
+        </View>
+        <Animated.View style={[styles.destinationHeartWrap, heart.animatedStyle]}>
+          <Pressable
+            style={[styles.destinationHeart, Shadows.soft]}
+            onPress={handleToggleLike}
+            accessibilityRole="button"
+            accessibilityLabel={liked ? 'Remove destination from wishlist' : 'Add destination to wishlist'}
+            accessibilityState={{ checked: liked }}
+          >
+            <Ionicons
+              name={liked ? 'heart' : 'heart-outline'}
+              size={17}
+              color={liked ? Colors.error : Colors.navy}
+            />
+          </Pressable>
+        </Animated.View>
+        <View style={styles.destinationContent}>
+          <Text style={styles.destinationCity} numberOfLines={1}>
+            {item.city}
+          </Text>
+          <Text style={styles.destinationState} numberOfLines={1}>
+            {item.state}
+          </Text>
+          <View style={styles.destinationRating}>
+            <Ionicons name="star" size={11} color={Colors.star} />
+            <Text style={styles.destinationRatingText}>4.8</Text>
+          </View>
+        </View>
+        <View style={styles.destinationStrip}>
+          <Text style={styles.destinationStripText}>Explore</Text>
+          <Ionicons name="arrow-forward" size={12} color={Colors.textWhite} />
+        </View>
+      </Pressable>
+    </Animated.View>
+  );
+}
+
+function DestinationSkeleton(): React.ReactElement {
+  return (
+    <View style={styles.skeletonRow}>
+      {[0, 1, 2].map((item) => (
+        <SkeletonLoader
+          key={item}
+          width={DESTINATION_CARD_WIDTH}
+          height={DESTINATION_CARD_HEIGHT}
+          borderRadius={20}
+          style={styles.destinationSkeleton}
+        />
+      ))}
+    </View>
+  );
+}
+
+function PackageSkeleton(): React.ReactElement {
+  return (
+    <View style={styles.skeletonRow}>
+      {[0, 1].map((item) => (
+        <SkeletonLoader
+          key={item}
+          width={PACKAGE_CARD_WIDTH}
+          height={330}
+          borderRadius={20}
+          style={styles.packageSkeleton}
+        />
+      ))}
+    </View>
+  );
+}
 
 export default function HomeScreen(): React.ReactElement {
-  const { user } = useAuth();
-  const unreadCount = useUnreadCount();
-  const { refetch: refetchLocations } = useLocations(true);
+  const insets = useSafeAreaInsets();
+  const slideUp = useSlideUp();
+  const { data: locations, isLoading: locationsLoading, refetch: refetchLocations } = useLocations(true);
   const { refetch: refetchCategories } = useCategories();
-  const { refetch: refetchFeaturedPackages } = useFeaturedPackages();
+  const { data: packages, isLoading: packagesLoading, refetch: refetchFeaturedPackages } = useFeaturedPackages();
   const [refreshing, setRefreshing] = useState(false);
+  const wishlistedDestinationIds = useWishlistStore(
+    (state) => state.wishlistedDestinationIds
+  );
+  const toggleDestinationWishlist = useWishlistStore(
+    (state) => state.toggleDestinationWishlist
+  );
 
   useWishlistIds();
 
-  const greeting = useMemo(() => {
-    const hour = new Date().getHours();
-    if (hour < 12) return 'Good morning';
-    if (hour < 17) return 'Good afternoon';
-    return 'Good evening';
-  }, []);
-
-  const firstName = useMemo(() => {
-    if (!user?.full_name) return null;
-    return user.full_name.split(' ')[0] ?? null;
-  }, [user?.full_name]);
+  const heroInsetStyle = useMemo(
+    () => StyleSheet.create({ value: { paddingTop: insets.top + 16 } }).value,
+    [insets.top]
+  );
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      await Promise.all([
-        refetchLocations(),
-        refetchCategories(),
-        refetchFeaturedPackages(),
-      ]);
+      await Promise.all([refetchLocations(), refetchCategories(), refetchFeaturedPackages()]);
     } finally {
       setRefreshing(false);
     }
   }, [refetchCategories, refetchFeaturedPackages, refetchLocations]);
 
-  const handleNotificationsPress = useCallback(() => {
-    router.push('/notifications' as never);
-  }, []);
-
-  const handleSearchFocus = useCallback(() => {
+  const handleSearchPress = useCallback(() => {
     router.push('/(tabs)/search');
   }, []);
 
-  return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={() => void handleRefresh()}
-            tintColor={Colors.primary}
-            colors={[Colors.primary]}
-          />
-        }
-      >
-        {/* ── Top Header ── */}
-        <View style={styles.header}>
-          <View style={styles.headerLeft}>
-            <Text style={styles.greeting} numberOfLines={1}>
-              {greeting}{firstName ? `, ${firstName}` : ''} 👋
-            </Text>
-            <Text style={styles.heading} numberOfLines={2}>
-              Discover India's{'\n'}Best Trips
-            </Text>
-          </View>
+  const handleDestinationPress = useCallback((location: Location) => {
+    router.push({
+      pathname: '/(tabs)/search',
+      params: { destination: location.city, state: location.state },
+    });
+  }, []);
 
-          {/* Notification bell */}
-          <Pressable
-            style={styles.notifButton}
-            onPress={handleNotificationsPress}
-            accessibilityRole="button"
-            accessibilityLabel={
-              unreadCount > 0
-                ? `Notifications, ${unreadCount} unread`
-                : 'Notifications'
-            }
-            hitSlop={8}
-          >
-            <Ionicons
-              name="notifications-outline"
-              size={22}
-              color={Colors.textPrimary}
-            />
-            {unreadCount > 0 ? (
-              <View style={styles.notifBadge}>
-                <Text style={styles.notifBadgeText} numberOfLines={1}>
-                  {unreadCount > 99 ? '99+' : unreadCount}
-                </Text>
-              </View>
-            ) : null}
-          </Pressable>
+  const handleToggleDestinationLike = useCallback((location: Location) => {
+    toggleDestinationWishlist(location);
+  }, [toggleDestinationWishlist]);
+
+  const handleCategoryPress = useCallback((label: string) => {
+    if (label === 'All') {
+      router.push('/(tabs)/search');
+      return;
+    }
+    router.push({
+      pathname: '/(tabs)/search',
+      params: { category: label.toLowerCase() },
+    });
+  }, []);
+
+  const renderCategory = useCallback(
+    ({ item }: { item: string }) => (
+      <Chip
+        label={item}
+        active={item === 'All'}
+        onPress={() => handleCategoryPress(item)}
+      />
+    ),
+    [handleCategoryPress]
+  );
+
+  const renderDestination: ListRenderItem<Location> = useCallback(
+    ({ item }) => (
+      <DestinationCard
+        item={item}
+        liked={wishlistedDestinationIds.has(item.id)}
+        onPress={handleDestinationPress}
+        onToggleLike={handleToggleDestinationLike}
+      />
+    ),
+    [handleDestinationPress, handleToggleDestinationLike, wishlistedDestinationIds]
+  );
+
+  const renderPackage: ListRenderItem<PackageListItem> = useCallback(
+    ({ item }) => <PackageCard item={item} width={PACKAGE_CARD_WIDTH} />,
+    []
+  );
+
+  return (
+    <View style={styles.root}>
+      <View style={[styles.hero, heroInsetStyle]}>
+        <View style={styles.greetingRow}>
+          <Text style={styles.greeting}>Good morning</Text>
+          <Ionicons name="airplane" size={13} color={Colors.primary} />
         </View>
 
-        {/* ── Search Bar — 3D elevated pill ── */}
-        <Pressable
-          style={styles.searchBar}
-          onPress={handleSearchFocus}
-          accessibilityRole="button"
-          accessibilityLabel="Search destinations"
+        <Text style={styles.logo}>NEXTTRP</Text>
+        <Text style={styles.tagline}>Travel More, Spend Less</Text>
+      </View>
+
+      <Animated.View style={[styles.contentWrap, slideUp.animatedStyle]}>
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => void handleRefresh()}
+              tintColor={Colors.primary}
+              colors={[Colors.primary]}
+            />
+          }
         >
-          <View style={styles.searchIconWrap}>
-            <Ionicons name="search-outline" size={18} color={Colors.primary} />
-          </View>
-          <Text style={styles.searchPlaceholder}>
-            Where do you want to go?
-          </Text>
-          <View style={styles.searchCta}>
-            <Text style={styles.searchCtaText}>Search</Text>
-          </View>
-        </Pressable>
+          <FlatList
+            data={CATEGORY_PILLS}
+            horizontal
+            renderItem={renderCategory}
+            keyExtractor={(item) => item}
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.categoryList}
+            ItemSeparatorComponent={PillSeparator}
+          />
 
-        {/* ── Popular Destinations ── */}
-        <PopularLocations />
+          <HomeSectionHeader
+            title="Popular Destinations"
+            onSeeAll={handleSearchPress}
+          />
+          {locationsLoading ? (
+            <DestinationSkeleton />
+          ) : (
+            <FlatList
+              data={locations ?? []}
+              horizontal
+              renderItem={renderDestination}
+              keyExtractor={(item) => item.id}
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.destinationList}
+              ItemSeparatorComponent={DestinationSeparator}
+            />
+          )}
 
-        {/* ── Browse by Category ── */}
-        <CategoryRow />
+          <HomeSectionHeader
+            title="Trending Packages"
+            onSeeAll={handleSearchPress}
+          />
+          {packagesLoading ? (
+            <PackageSkeleton />
+          ) : (
+            <FlatList
+              data={packages ?? []}
+              horizontal
+              renderItem={renderPackage}
+              keyExtractor={(item) => item.id}
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.packageList}
+              ItemSeparatorComponent={PackageSeparator}
+              snapToInterval={PACKAGE_CARD_WIDTH + PACKAGE_CARD_GAP}
+              decelerationRate="fast"
+            />
+          )}
 
-        {/* ── Trending Packages ── */}
-        <FeaturedPackages />
-
-        <View style={styles.bottomSpacer} />
-      </ScrollView>
-    </SafeAreaView>
+        </ScrollView>
+      </Animated.View>
+    </View>
   );
 }
 
+function PillSeparator(): React.ReactElement {
+  return <View style={styles.pillSeparator} />;
+}
+
+function DestinationSeparator(): React.ReactElement {
+  return <View style={styles.destinationSeparator} />;
+}
+
+function PackageSeparator(): React.ReactElement {
+  return <View style={styles.packageSeparator} />;
+}
+
 const styles = StyleSheet.create({
-  safeArea: {
-    backgroundColor: Colors.backgroundBase,
+  root: {
+    backgroundColor: Colors.background,
+    flex: 1,
+  },
+  hero: {
+    backgroundColor: Colors.background,
+    paddingBottom: 14,
+    paddingHorizontal: 20,
+  },
+  greetingRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 6,
+    marginTop: 8,
+  },
+  greeting: {
+    color: Colors.textSecondary,
+    fontSize: 13,
+  },
+  logo: {
+    color: Colors.primary,
+    fontSize: 28,
+    fontWeight: '800',
+    marginTop: 18,
+  },
+  tagline: {
+    color: Colors.textSecondary,
+    fontSize: 13,
+    marginTop: 2,
+  },
+  contentWrap: {
     flex: 1,
   },
   scrollView: {
     flex: 1,
   },
-  content: {
-    flexGrow: 1,
-    paddingBottom: 16,
+  scrollContent: {
+    paddingTop: 20,
+  },
+  categoryList: {
     paddingHorizontal: 20,
   },
-
-  // ── Header ──────────────────────────────────────────────────
-  header: {
+  pillSeparator: {
+    width: 8,
+  },
+  sectionHeader: {
+    alignItems: 'center',
     flexDirection: 'row',
-    alignItems: 'flex-start',
     justifyContent: 'space-between',
-    paddingTop: 24,
-    paddingBottom: 24,
+    marginHorizontal: 20,
+    marginTop: 24,
   },
-  headerLeft: {
-    flex: 1,
-    marginRight: 12,
-  },
-  greeting: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: Colors.textSecondary,
-    marginBottom: 6,
-    letterSpacing: 0.2,
-  },
-  heading: {
-    fontSize: 30,
-    fontWeight: '800',
-    color: Colors.textPrimary,
-    lineHeight: 38,
-    letterSpacing: -0.5,
-  },
-  notifButton: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    backgroundColor: Colors.surfacePrimary,
-    borderWidth: 1,
-    borderColor: Colors.surfaceBorder,
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-    marginTop: 6,
-    // 3D shadow
-    shadowColor: '#0F1535',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.10,
-    shadowRadius: 12,
-    elevation: 6,
-  },
-  notifBadge: {
-    position: 'absolute',
-    top: -3,
-    right: -3,
-    backgroundColor: Colors.error,
-    borderRadius: 10,
-    borderWidth: 2,
-    borderColor: Colors.backgroundBase,
-    minWidth: 18,
-    minHeight: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 3,
-  },
-  notifBadgeText: {
-    color: Colors.white,
-    fontSize: 9,
+  sectionTitle: {
+    color: Colors.navy,
+    fontSize: 18,
     fontWeight: '700',
-    lineHeight: 12,
   },
-
-  // ── Search Bar ───────────────────────────────────────────────
-  searchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.surfacePrimary,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: Colors.surfaceBorder,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    marginBottom: 28,
-    // 3D depth shadow
-    shadowColor: '#0F1535',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.10,
-    shadowRadius: 20,
-    elevation: 8,
-  },
-  searchIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: Colors.primaryGlow,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  searchPlaceholder: {
-    flex: 1,
-    fontSize: 15,
-    color: Colors.textTertiary,
-    fontWeight: '400',
-  },
-  searchCta: {
-    backgroundColor: Colors.primary,
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    // Button glow
-    shadowColor: Colors.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
-    elevation: 6,
-  },
-  searchCtaText: {
-    color: Colors.white,
+  seeAll: {
+    color: Colors.primary,
     fontSize: 13,
     fontWeight: '700',
-    letterSpacing: 0.3,
   },
-
-  bottomSpacer: {
-    height: 104,
+  destinationList: {
+    paddingLeft: 20,
+    paddingRight: 20,
+    paddingTop: 12,
+  },
+  destinationSeparator: {
+    width: 12,
+  },
+  destinationCard: {
+    borderRadius: 20,
+    height: DESTINATION_CARD_HEIGHT,
+    overflow: 'hidden',
+    width: DESTINATION_CARD_WIDTH,
+  },
+  destinationImage: {
+    height: '100%',
+    width: '100%',
+  },
+  destinationOverlay: {
+    backgroundColor: Colors.overlayLight,
+    bottom: 0,
+    height: 96,
+    left: 0,
+    position: 'absolute',
+    right: 0,
+  },
+  destinationBadge: {
+    backgroundColor: Colors.primary,
+    borderRadius: 999,
+    left: 12,
+    opacity: 0.9,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    position: 'absolute',
+    top: 12,
+  },
+  destinationBadgeText: {
+    color: Colors.textWhite,
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  destinationHeartWrap: {
+    position: 'absolute',
+    right: 12,
+    top: 12,
+  },
+  destinationHeart: {
+    alignItems: 'center',
+    backgroundColor: Colors.backgroundWhite,
+    borderRadius: 16,
+    height: 32,
+    justifyContent: 'center',
+    width: 32,
+  },
+  destinationContent: {
+    bottom: 36,
+    left: 0,
+    padding: 12,
+    position: 'absolute',
+    right: 0,
+  },
+  destinationCity: {
+    color: Colors.textWhite,
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  destinationState: {
+    color: Colors.textWhite,
+    fontSize: 11,
+    marginTop: 2,
+    opacity: 0.75,
+  },
+  destinationRating: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 3,
+    marginTop: 4,
+  },
+  destinationRatingText: {
+    color: Colors.textWhite,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  destinationStrip: {
+    alignItems: 'center',
+    backgroundColor: Colors.primary,
+    bottom: 0,
+    flexDirection: 'row',
+    gap: 4,
+    justifyContent: 'center',
+    left: 0,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    position: 'absolute',
+    right: 0,
+  },
+  destinationStripText: {
+    color: Colors.textWhite,
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  skeletonRow: {
+    flexDirection: 'row',
+    paddingLeft: 20,
+    paddingTop: 12,
+  },
+  destinationSkeleton: {
+    marginRight: 12,
+  },
+  packageSkeleton: {
+    marginRight: PACKAGE_CARD_GAP,
+  },
+  packageList: {
+    paddingLeft: 20,
+    paddingRight: 20,
+    paddingTop: 12,
+  },
+  packageSeparator: {
+    width: PACKAGE_CARD_GAP,
   },
 });

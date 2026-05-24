@@ -147,6 +147,30 @@ export const LocationsQuerySchema = z.object({
 });
 
 /**
+ * Validates both :id and :imageId UUID route parameters for image endpoints.
+ */
+export const ImageParamsSchema = z.object({
+  id: z.string().uuid(),
+  imageId: z.string().uuid(),
+});
+
+/**
+ * Validates the body when a vendor saves a Cloudinary-uploaded image.
+ * The file is uploaded directly from the client to Cloudinary; only the
+ * resulting metadata (URL + public_id) is sent to our backend.
+ */
+export const PackageImageSaveSchema = z
+  .object({
+    url: z.string().url('url must be a valid URL'),
+    public_id: z.string().trim().min(1).max(500),
+    alt_text: z.string().trim().max(200).optional(),
+    is_cover: z.boolean().optional().default(false),
+  })
+  .strict();
+
+export type PackageImageSaveInput = z.infer<typeof PackageImageSaveSchema>;
+
+/**
  * Profile update input after validation and normalization.
  */
 export type UpdateProfileInput = z.infer<typeof UpdateProfileSchema>;

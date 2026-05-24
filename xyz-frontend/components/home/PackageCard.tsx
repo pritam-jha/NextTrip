@@ -1,32 +1,30 @@
 /**
  * @file components/home/PackageCard.tsx
- * @description Premium Light 3D package card.
- *
- * - Full-bleed image top (200px) with rounded top corners
- * - White card body with multi-layer 3D shadow
- * - Inner top highlight strip (light source)
- * - Heart: white circle top-right of image with shadow
- * - Badge: navy/gold pill top-left of image
- * - Title, location (navy pin), duration, rating (gold stars), price (navy), compare
- *
- * ✅ All existing logic preserved — hooks, navigation, compare, wishlist untouched.
+ * @description NEXTTRP trending package card.
  */
 
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  Animated,
   Image,
   Pressable,
   StyleSheet,
   Text,
   View,
+  type GestureResponderEvent,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 
+import { Badge } from '../ui/Badge';
+import { StarRating } from '../ui/StarRating';
 import { useCompare } from '../../hooks/useCompare';
 import { useToggleWishlist } from '../../hooks/useWishlist';
 import { useWishlistStore } from '../../store/wishlistStore';
 import { Colors } from '../../constants/colors';
+import { Shadows } from '../../constants/shadows';
+import { use3DCard, useHeartBounce } from '../../utils/animations';
+import { getPackageKeywordImage, PACKAGE_DEFAULT_IMAGE } from '../../utils/packageImages';
 import type { PackageListItem } from '../../types';
 
 export interface PackageCardProps {
@@ -57,7 +55,7 @@ function getCloudinaryUrl(
   return url.replace(marker, `${marker}c_fill,w_${width},h_${height},f_auto,q_auto/`);
 }
 
-function getBadgeLabel(item: PackageListItem): 'FEATURED' | 'BESTSELLER' | null {
+function getBadge(item: PackageListItem): 'FEATURED' | 'BESTSELLER' | null {
   if (item.is_featured) return 'FEATURED';
   if (item.is_bestseller) return 'BESTSELLER';
   return null;
@@ -69,17 +67,18 @@ export function PackageCard({
   onCompareFull,
 }: PackageCardProps): React.ReactElement {
   const widthStyle = useMemo(
-    () => StyleSheet.create({ value: { width } }).value,
+    () => StyleSheet.create({ cardWidth: { width } }).cardWidth,
     [width]
   );
+  const card3D = use3DCard();
+  const heartBounce = useHeartBounce();
 
   const isWishlisted = useWishlistStore((state) => state.isWishlisted(item.id));
   const { mutate: toggleWishlist, isPending: isWishlistPending } = useToggleWishlist();
   const { addToCompare, removeFromCompare, isInCompare } = useCompare();
 
   const inCompare = isInCompare(item.id);
-  const coverImage = getCloudinaryUrl(item.cover_image, 900, 600);
-  const badgeLabel = getBadgeLabel(item);
+  const badge = getBadge(item);
   const firstPricing = item.pricing[0] ?? null;
   const basePrice = firstPricing?.base_price ?? null;
   const discountedPrice =
@@ -89,14 +88,47 @@ export function PackageCard({
     firstPricing.discounted_price < basePrice
       ? firstPricing.discounted_price
       : null;
+  const finalPrice = discountedPrice ?? basePrice;
+
+  /**
+   * Image priority order — guarantees the correct destination photo is shown:
+   *   [0] Keyword-matched destination image  → always the right location
+   *   [1] Cloudinary cover_image from DB     → only if no keyword match
+   *   [2] PACKAGE_DEFAULT_IMAGE             → last resort, never blank
+   *
+   * On each onError we advance to the next source so no card ever shows gray.
+   */
+  const imageSources = useMemo((): string[] => {
+    const sources: string[] = [];
+    const keywordImage = getPackageKeywordImage(item);
+    const cloudinaryImage = getCloudinaryUrl(item.cover_image, 900, 600);
+    if (keywordImage) sources.push(keywordImage);
+    if (cloudinaryImage && cloudinaryImage !== keywordImage) sources.push(cloudinaryImage);
+    sources.push(PACKAGE_DEFAULT_IMAGE);
+    return sources;
+  }, [item]);
+
+  const [imageIndex, setImageIndex] = useState(0);
+
+  useEffect(() => {
+    setImageIndex(0);
+  }, [item.id]);
+
+  const coverImage = imageSources[Math.min(imageIndex, imageSources.length - 1)];
+
+  const handleImageError = useCallback(() => {
+    setImageIndex((prev) => prev + 1);
+  }, []);
 
   const handleCardPress = useCallback(() => {
     router.push({ pathname: '/package/[id]' as never, params: { id: item.id } });
   }, [item.id]);
 
-  const handleWishlistPress = useCallback(() => {
+  const handleWishlistPress = useCallback((event: GestureResponderEvent) => {
+    event.stopPropagation();
+    heartBounce.trigger();
     toggleWishlist({ packageId: item.id });
-  }, [item.id, toggleWishlist]);
+  }, [heartBounce, item.id, toggleWishlist]);
 
   const handleComparePress = useCallback(() => {
     if (inCompare) {
@@ -108,417 +140,309 @@ export function PackageCard({
   }, [addToCompare, inCompare, item, onCompareFull, removeFromCompare]);
 
   return (
-    <Pressable
-      style={[styles.card, widthStyle]}
-      onPress={handleCardPress}
-      accessibilityRole="button"
-      accessibilityLabel={`View package ${item.title}`}
-    >
-      {/* ── Image ── */}
-      <View style={styles.imageWrap}>
-        {coverImage ? (
+    <Animated.View style={[card3D.animatedStyle, widthStyle]}>
+      <Pressable
+        style={[styles.card, Shadows.card]}
+        onPress={handleCardPress}
+        onPressIn={card3D.onPressIn}
+        onPressOut={card3D.onPressOut}
+        accessibilityRole="button"
+        accessibilityLabel={`View package ${item.title}`}
+      >
+        <View style={styles.imageWrap}>
           <Image
             source={{ uri: coverImage }}
             style={styles.coverImage}
             resizeMode="cover"
             accessibilityLabel={`Cover image for ${item.title}`}
+            onError={handleImageError}
           />
-        ) : (
-          <View style={styles.imageFallback}>
-            <Ionicons name="image-outline" size={40} color={Colors.textTertiary} />
-          </View>
-        )}
 
-        {/* Subtle dark gradient at bottom of image for text legibility */}
-        <View style={styles.imageGradient} pointerEvents="none" />
+          <View style={styles.imageScrim} pointerEvents="none" />
 
-        {/* Badge top-left */}
-        {badgeLabel ? (
-          <View
-            style={[
-              styles.badge,
-              badgeLabel === 'FEATURED' ? styles.badgeFeatured : styles.badgeBestseller,
-            ]}
-          >
-            {badgeLabel === 'FEATURED' ? (
-              <Ionicons name="star" size={9} color={Colors.white} style={{ marginRight: 4 }} />
-            ) : (
-              <Ionicons name="flame" size={9} color={Colors.gold} style={{ marginRight: 4 }} />
-            )}
-            <Text style={[
-              styles.badgeText,
-              badgeLabel === 'FEATURED' ? styles.badgeTextFeatured : styles.badgeTextBestseller,
-            ]}>
-              {badgeLabel}
-            </Text>
-          </View>
-        ) : null}
-
-        {/* Wishlist heart top-right */}
-        <Pressable
-          style={[styles.wishlistButton, isWishlisted && styles.wishlistButtonActive]}
-          onPress={handleWishlistPress}
-          disabled={isWishlistPending}
-          accessibilityRole="button"
-          accessibilityLabel={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
-          accessibilityState={{ checked: isWishlisted, disabled: isWishlistPending }}
-          hitSlop={8}
-        >
-          <Ionicons
-            name={isWishlisted ? 'heart' : 'heart-outline'}
-            size={17}
-            color={isWishlisted ? Colors.wishlistActive : Colors.textSecondary}
-          />
-        </Pressable>
-      </View>
-
-      {/* ── Card Body ── */}
-      <View style={styles.body}>
-        {/* Inner top highlight — 3D light source */}
-        <View style={styles.bodyTopEdge} pointerEvents="none" />
-
-        {/* Category chip */}
-        {item.category?.label ? (
-          <View style={styles.categoryChip}>
-            <Text style={styles.categoryText}>{item.category.icon} {item.category.label}</Text>
-          </View>
-        ) : null}
-
-        {/* Title */}
-        <Text style={styles.title} numberOfLines={2}>
-          {item.title}
-        </Text>
-
-        {/* Location */}
-        <View style={styles.locationRow}>
-          <Ionicons name="location" size={12} color={Colors.primary} />
-          <Text style={styles.locationText} numberOfLines={1}>
-            {item.location.city}, {item.location.state}
-          </Text>
-        </View>
-
-        {/* Duration + Group size */}
-        <View style={styles.metaRow}>
-          <View style={styles.metaItem}>
-            <View style={styles.metaIconWrap}>
-              <Ionicons name="time-outline" size={11} color={Colors.primary} />
+          {badge ? (
+            <View style={styles.badgeWrap}>
+              <Badge type={badge} />
             </View>
-            <Text style={styles.metaText}>
-              {item.duration_days}D / {item.duration_nights}N
-            </Text>
-          </View>
-          <View style={styles.metaDot} />
-          <View style={styles.metaItem}>
-            <View style={styles.metaIconWrap}>
-              <Ionicons name="people-outline" size={11} color={Colors.primary} />
-            </View>
-            <Text style={styles.metaText}>
-              {item.min_group_size}–{item.max_group_size} pax
+          ) : null}
+
+          <Animated.View style={[styles.wishlistWrap, heartBounce.animatedStyle]}>
+            <Pressable
+              style={[styles.wishlistButton, Shadows.soft]}
+              onPress={handleWishlistPress}
+              disabled={isWishlistPending}
+              accessibilityRole="button"
+              accessibilityLabel={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
+              accessibilityState={{ checked: isWishlisted, disabled: isWishlistPending }}
+              hitSlop={HIT_SLOP}
+            >
+              <Ionicons
+                name={isWishlisted ? 'heart' : 'heart-outline'}
+                size={18}
+                color={isWishlisted ? Colors.error : Colors.navy}
+              />
+            </Pressable>
+          </Animated.View>
+
+          <View style={styles.categoryPill}>
+            <Text style={styles.categoryPillText} numberOfLines={1}>
+              {item.category.label}
             </Text>
           </View>
         </View>
 
-        {/* Rating */}
-        <View style={styles.ratingRow}>
-          {[1, 2, 3, 4, 5].map((star) => (
-            <Ionicons
-              key={star}
-              name={star <= Math.round(item.avg_rating) ? 'star' : 'star-outline'}
-              size={11}
-              color={Colors.star}
-            />
-          ))}
-          <Text style={styles.ratingText}>
-            {item.avg_rating.toFixed(1)}
+        <View style={styles.body}>
+          <Text style={styles.title} numberOfLines={2}>
+            {item.title}
           </Text>
-          <Text style={styles.reviewCount}>({item.review_count})</Text>
-        </View>
 
-        {/* Divider */}
-        <View style={styles.divider} />
-
-        {/* Price + Compare */}
-        <View style={styles.footerRow}>
-          <View style={styles.priceBlock}>
-            <Text style={styles.priceFrom}>Starting from</Text>
-            {basePrice === null ? (
-              <Text style={styles.priceValue}>On request</Text>
-            ) : discountedPrice !== null ? (
-              <View style={styles.priceRow}>
-                <Text style={styles.priceStrike}>{formatPrice(basePrice)}</Text>
-                <Text style={styles.priceValue}>{formatPrice(discountedPrice)}</Text>
-              </View>
-            ) : (
-              <Text style={styles.priceValue}>{formatPrice(basePrice)}</Text>
-            )}
-            <Text style={styles.pricePer}>per person</Text>
+          <View style={styles.locationRow}>
+            <Ionicons name="location" size={12} color={Colors.primary} />
+            <Text style={styles.locationText} numberOfLines={1}>
+              {item.location.city}, {item.location.state}
+            </Text>
           </View>
 
-          <Pressable
-            style={[styles.compareButton, inCompare && styles.compareButtonActive]}
-            onPress={handleComparePress}
-            accessibilityRole="button"
-            accessibilityLabel={inCompare ? 'Remove from compare' : 'Add to compare'}
-          >
-            <Ionicons
-              name={inCompare ? 'checkmark' : 'git-compare-outline'}
-              size={12}
-              color={inCompare ? Colors.white : Colors.primary}
-            />
-            <Text style={[styles.compareText, inCompare && styles.compareTextActive]}>
-              {inCompare ? 'Added' : 'Compare'}
-            </Text>
-          </Pressable>
+          <View style={styles.statsRow}>
+            <View style={styles.statItem}>
+              <Ionicons name="time-outline" size={13} color={Colors.textSecondary} />
+              <Text style={styles.statText} numberOfLines={1}>
+                {item.duration_days}D/{item.duration_nights}N
+              </Text>
+            </View>
+            <View style={styles.statItem}>
+              <Ionicons name="people-outline" size={13} color={Colors.textSecondary} />
+              <Text style={styles.statText} numberOfLines={1}>
+                {item.min_group_size}-{item.max_group_size}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.ratingRow}>
+            <StarRating rating={item.avg_rating} size={13} />
+            <Text style={styles.ratingValue}>{item.avg_rating.toFixed(1)}</Text>
+            <Text style={styles.reviewCount}>({item.review_count})</Text>
+          </View>
+
+          <View style={styles.divider} />
+
+          <View style={styles.footerRow}>
+            <View style={styles.priceBlock}>
+              {finalPrice === null ? (
+                <Text style={styles.priceValue}>On request</Text>
+              ) : (
+                <>
+                  <Text style={styles.priceValue}>{formatPrice(finalPrice)}</Text>
+                  <Text style={styles.perPerson}>per person</Text>
+                  {discountedPrice !== null && basePrice !== null ? (
+                    <Text style={styles.priceStrike}>{formatPrice(basePrice)}</Text>
+                  ) : null}
+                </>
+              )}
+            </View>
+
+            <View style={styles.actions}>
+              <Pressable
+                style={[styles.compareButton, inCompare && styles.compareButtonActive]}
+                onPress={handleComparePress}
+                accessibilityRole="button"
+                accessibilityLabel={inCompare ? 'Remove from compare' : 'Add to compare'}
+              >
+                <Ionicons
+                  name={inCompare ? 'checkmark' : 'git-compare-outline'}
+                  size={13}
+                  color={inCompare ? Colors.textWhite : Colors.primary}
+                />
+              </Pressable>
+              <Pressable
+                style={styles.bookButton}
+                onPress={handleCardPress}
+                accessibilityRole="button"
+                accessibilityLabel={`Book ${item.title}`}
+              >
+                <Text style={styles.bookButtonText}>Book Now</Text>
+              </Pressable>
+            </View>
+          </View>
         </View>
-      </View>
-    </Pressable>
+      </Pressable>
+    </Animated.View>
   );
 }
 
-// ── Styles ────────────────────────────────────────────────────────────────────
+const HIT_SLOP = {
+  bottom: 8,
+  left: 8,
+  right: 8,
+  top: 8,
+};
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: Colors.surfacePrimary,
+    backgroundColor: Colors.surface,
     borderRadius: 20,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: Colors.surfaceBorder,
-    // Premium 3D shadow
-    shadowColor: '#0F1535',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.12,
-    shadowRadius: 24,
-    elevation: 12,
   },
   imageWrap: {
-    height: 200,
-    backgroundColor: Colors.backgroundLayer3,
+    backgroundColor: Colors.backgroundSoft,
+    height: 185,
     position: 'relative',
   },
   coverImage: {
-    width: '100%',
     height: '100%',
+    width: '100%',
   },
   imageFallback: {
-    flex: 1,
     alignItems: 'center',
+    backgroundColor: Colors.backgroundSoft,
+    flex: 1,
     justifyContent: 'center',
-    backgroundColor: Colors.backgroundLayer2,
   },
-  imageGradient: {
-    position: 'absolute',
+  imageScrim: {
+    backgroundColor: Colors.overlayLight,
     bottom: 0,
+    height: 78,
     left: 0,
+    position: 'absolute',
     right: 0,
-    height: 70,
-    backgroundColor: 'rgba(15,21,53,0.35)',
   },
-  badge: {
+  badgeWrap: {
+    left: 12,
     position: 'absolute',
     top: 12,
-    left: 12,
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    flexDirection: 'row',
-    alignItems: 'center',
   },
-  badgeFeatured: {
-    backgroundColor: Colors.primary,
-  },
-  badgeBestseller: {
-    backgroundColor: 'rgba(245,158,11,0.15)',
-    borderWidth: 1,
-    borderColor: Colors.gold,
-  },
-  badgeText: {
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 0.8,
-    textTransform: 'uppercase',
-  },
-  badgeTextFeatured: {
-    color: Colors.white,
-  },
-  badgeTextBestseller: {
-    color: Colors.gold,
+  wishlistWrap: {
+    position: 'absolute',
+    right: 12,
+    top: 12,
   },
   wishlistButton: {
-    position: 'absolute',
-    top: 12,
-    right: 12,
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: Colors.white,
     alignItems: 'center',
+    backgroundColor: Colors.backgroundWhite,
+    borderRadius: 16,
+    height: 32,
     justifyContent: 'center',
-    shadowColor: '#0F1535',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    elevation: 4,
+    width: 32,
   },
-  wishlistButtonActive: {
-    backgroundColor: 'rgba(229,62,62,0.08)',
+  categoryPill: {
+    backgroundColor: Colors.overlay,
+    borderRadius: 999,
+    bottom: 12,
+    left: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    position: 'absolute',
+  },
+  categoryPillText: {
+    color: Colors.textWhite,
+    fontSize: 11,
+    fontWeight: '700',
   },
   body: {
-    padding: 16,
-    backgroundColor: Colors.surfacePrimary,
-    position: 'relative',
-  },
-  bodyTopEdge: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 1,
-    backgroundColor: Colors.surfaceBorder,
-  },
-  categoryChip: {
-    alignSelf: 'flex-start',
-    backgroundColor: Colors.primaryGlow,
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-    marginBottom: 8,
-  },
-  categoryText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: Colors.primary,
+    backgroundColor: Colors.surface,
+    padding: 14,
   },
   title: {
+    color: Colors.navy,
     fontSize: 16,
-    fontWeight: '700',
-    color: Colors.textPrimary,
-    lineHeight: 22,
-    marginBottom: 6,
-    letterSpacing: -0.2,
+    fontWeight: '600',
+    lineHeight: 21,
   },
   locationRow: {
-    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
+    flexDirection: 'row',
     gap: 4,
+    marginTop: 4,
   },
   locationText: {
-    fontSize: 12,
     color: Colors.textSecondary,
     flex: 1,
-    fontWeight: '500',
+    fontSize: 13,
   },
-  metaRow: {
+  statsRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10,
+    gap: 14,
+    marginTop: 6,
   },
-  metaItem: {
-    flexDirection: 'row',
+  statItem: {
     alignItems: 'center',
+    flexDirection: 'row',
     gap: 4,
   },
-  metaIconWrap: {
-    width: 18,
-    height: 18,
-    borderRadius: 5,
-    backgroundColor: Colors.primaryGlow,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  metaDot: {
-    width: 3,
-    height: 3,
-    borderRadius: 2,
-    backgroundColor: Colors.textTertiary,
-    marginHorizontal: 8,
-  },
-  metaText: {
-    fontSize: 12,
+  statText: {
     color: Colors.textSecondary,
-    fontWeight: '500',
+    fontSize: 12,
   },
   ratingRow: {
-    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
-    gap: 2,
+    flexDirection: 'row',
+    gap: 4,
+    marginTop: 6,
   },
-  ratingText: {
-    fontSize: 12,
+  ratingValue: {
+    color: Colors.navy,
+    fontSize: 13,
     fontWeight: '700',
-    color: Colors.textPrimary,
-    marginLeft: 5,
   },
   reviewCount: {
-    fontSize: 11,
-    color: Colors.textTertiary,
-    marginLeft: 2,
+    color: Colors.textLight,
+    fontSize: 12,
   },
   divider: {
+    backgroundColor: Colors.divider,
     height: 1,
-    backgroundColor: Colors.surfaceBorder,
-    marginBottom: 12,
+    marginTop: 10,
   },
   footerRow: {
-    flexDirection: 'row',
     alignItems: 'flex-end',
+    flexDirection: 'row',
     justifyContent: 'space-between',
+    marginTop: 10,
   },
   priceBlock: {
     flex: 1,
   },
-  priceFrom: {
-    fontSize: 11,
-    color: Colors.textTertiary,
-    marginBottom: 2,
-    fontWeight: '500',
+  priceValue: {
+    color: Colors.primary,
+    fontSize: 20,
+    fontWeight: '700',
   },
-  priceRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 6,
+  perPerson: {
+    color: Colors.textLight,
+    fontSize: 11,
   },
   priceStrike: {
+    color: Colors.textLight,
     fontSize: 12,
-    color: Colors.textTertiary,
+    marginTop: 2,
     textDecorationLine: 'line-through',
   },
-  priceValue: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: Colors.primary,
-    lineHeight: 26,
-    letterSpacing: -0.5,
-  },
-  pricePer: {
-    fontSize: 11,
-    color: Colors.textTertiary,
-    marginTop: 1,
-    fontWeight: '500',
+  actions: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
   },
   compareButton: {
-    flexDirection: 'row',
     alignItems: 'center',
-    borderColor: Colors.surfaceBorderStrong,
+    borderColor: Colors.primary,
     borderRadius: 10,
     borderWidth: 1.5,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-    gap: 4,
-    backgroundColor: Colors.backgroundLayer2,
+    height: 34,
+    justifyContent: 'center',
+    width: 34,
   },
   compareButtonActive: {
     backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
   },
-  compareText: {
-    fontSize: 11,
+  bookButton: {
+    backgroundColor: Colors.navy,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  bookButtonText: {
+    color: Colors.textWhite,
+    fontSize: 12,
     fontWeight: '600',
-    color: Colors.textSecondary,
-  },
-  compareTextActive: {
-    color: Colors.white,
   },
 });

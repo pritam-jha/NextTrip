@@ -1,20 +1,9 @@
 /**
  * @file components/ui/Button.tsx
- * @description Premium Light 3D button component.
- *
- * Variants: primary (deep navy) | secondary (light) | outline | ghost | danger
- * Sizes: default | small
- * - Rounded corners (borderRadius: 14 default, 10 small)
- * - Multi-layer 3D shadow on primary
- * - Inner top highlight strip (light source simulation)
- * - Press scale animation (0.97)
- * - Loading state with ActivityIndicator
- * - All colours from constants/colors.ts
- *
- * ✅ All existing props preserved — zero logic changes.
+ * @description NEXTTRP button component.
  */
 
-import React, { useRef, useCallback } from 'react';
+import React, { useCallback, useRef } from 'react';
 import {
   ActivityIndicator,
   Animated,
@@ -28,10 +17,16 @@ import {
 import { Colors } from '../../constants/colors';
 import { Shadows } from '../../constants/shadows';
 
-// ── Types ─────────────────────────────────────────────────────────────────────
-
-export type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger';
-export type ButtonSize = 'default' | 'small';
+export type ButtonVariant =
+  | 'primary'
+  | 'secondary'
+  | 'accent'
+  | 'navy'
+  | 'outline'
+  | 'outlineBlue'
+  | 'ghost'
+  | 'danger';
+export type ButtonSize = 'default' | 'small' | 'large';
 
 export interface ButtonProps {
   label: string;
@@ -50,8 +45,6 @@ export interface ButtonProps {
   accessibilityState?: object;
 }
 
-// ── Component ─────────────────────────────────────────────────────────────────
-
 export const Button: React.FC<ButtonProps> = ({
   label,
   onPress,
@@ -67,16 +60,16 @@ export const Button: React.FC<ButtonProps> = ({
   rightIcon,
   accessibilityLabel,
 }) => {
+  const scale = useRef(new Animated.Value(1)).current;
   const isBusy = loading || isLoading;
   const isDisabled = disabled || isBusy;
-  const scale = useRef(new Animated.Value(1)).current;
 
   const handlePressIn = useCallback(() => {
     Animated.spring(scale, {
       toValue: 0.97,
       useNativeDriver: true,
       friction: 8,
-      tension: 120,
+      tension: 140,
     }).start();
   }, [scale]);
 
@@ -85,25 +78,24 @@ export const Button: React.FC<ButtonProps> = ({
       toValue: 1,
       useNativeDriver: true,
       friction: 8,
-      tension: 120,
+      tension: 140,
     }).start();
   }, [scale]);
 
-  const spinnerColor = variant === 'primary' ? Colors.white : Colors.primary;
-
-  const containerStyle = [
-    styles.base,
-    size === 'small' ? styles.baseSmall : styles.baseDefault,
-    styles[variant],
-    isDisabled && (styles[`${variant}Disabled` as keyof typeof styles] as ViewStyle),
-    fullWidth && styles.fullWidth,
-    // 3D shadow only on primary
-    variant === 'primary' && !isDisabled ? Shadows.neonGlow : undefined,
-    style,
-  ];
+  const spinnerColor =
+    variant === 'outline' || variant === 'outlineBlue' || variant === 'ghost'
+      ? Colors.primary
+      : Colors.textWhite;
 
   return (
-    <Animated.View style={[{ transform: [{ scale }] }, fullWidth && styles.fullWidth]}>
+    <Animated.View
+      style={[
+        styles.animatedWrap,
+        fullWidth && styles.fullWidth,
+        styles.animatedScale,
+        { transform: [{ scale }] },
+      ]}
+    >
       <Pressable
         onPress={onPress}
         onPressIn={handlePressIn}
@@ -112,17 +104,17 @@ export const Button: React.FC<ButtonProps> = ({
         accessibilityRole="button"
         accessibilityLabel={accessibilityLabel ?? label}
         accessibilityState={{ disabled: isDisabled, busy: isBusy }}
-        style={containerStyle}
+        style={[
+          styles.base,
+          styles[size],
+          styles[variant],
+          isDisabled && styles.disabled,
+          fullWidth && styles.fullWidth,
+          variant === 'primary' && !isDisabled && Shadows.glow,
+          variant === 'secondary' && !isDisabled && Shadows.blue,
+          style,
+        ]}
       >
-        {/* Inner top highlight strip — simulates 3D light source */}
-        {(variant === 'primary' || variant === 'secondary') && !isDisabled && (
-          <View style={styles.innerHighlight} pointerEvents="none" />
-        )}
-        {/* Inner bottom shadow strip — simulates 3D depth */}
-        {variant === 'primary' && !isDisabled && (
-          <View style={styles.innerShadow} pointerEvents="none" />
-        )}
-
         {isBusy ? (
           <ActivityIndicator color={spinnerColor} size="small" />
         ) : (
@@ -132,9 +124,8 @@ export const Button: React.FC<ButtonProps> = ({
               numberOfLines={1}
               style={[
                 styles.label,
-                size === 'small' ? styles.labelSmall : styles.labelDefault,
+                styles[`${size}Label` as keyof typeof styles] as TextStyle,
                 styles[`${variant}Label` as keyof typeof styles] as TextStyle,
-                isDisabled && (styles[`${variant}LabelDisabled` as keyof typeof styles] as TextStyle),
                 labelStyle,
               ]}
             >
@@ -148,147 +139,76 @@ export const Button: React.FC<ButtonProps> = ({
   );
 };
 
-// ── Styles ────────────────────────────────────────────────────────────────────
-
 const styles = StyleSheet.create({
-  base: {
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    overflow: 'hidden',
-    position: 'relative',
+  animatedWrap: {
+    alignSelf: 'flex-start',
   },
-  baseDefault: {
-    paddingHorizontal: 28,
-    paddingVertical: 15,
-    minHeight: 52,
-  },
-  baseSmall: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    minHeight: 36,
-  },
+  animatedScale: {},
   fullWidth: {
+    alignSelf: 'stretch',
     width: '100%',
   },
-
-  // ── Inner 3D light/shadow strips ─────────────────────────
-  innerHighlight: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 1,
-    backgroundColor: 'rgba(255,255,255,0.40)',
+  base: {
+    alignItems: 'center',
     borderRadius: 14,
+    borderWidth: 1.5,
+    justifyContent: 'center',
   },
-  innerShadow: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 2,
-    backgroundColor: 'rgba(0,0,0,0.15)',
-    borderRadius: 14,
+  default: {
+    minHeight: 52,
+    paddingHorizontal: 28,
+    paddingVertical: 15,
   },
-
-  // ── primary — Deep Navy ───────────────────────────────────
+  small: {
+    minHeight: 36,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 10,
+  },
+  large: {
+    minHeight: 58,
+    paddingHorizontal: 36,
+    paddingVertical: 18,
+    borderRadius: 16,
+  },
   primary: {
     backgroundColor: Colors.primary,
     borderColor: Colors.primary,
   },
-  primaryDisabled: {
-    backgroundColor: Colors.backgroundLayer3,
-    borderColor: Colors.surfaceBorder,
-  },
-  primaryLabel: {
-    color: Colors.white,
-    fontWeight: '700',
-    textAlign: 'center',
-    letterSpacing: 0.3,
-  },
-  primaryLabelDisabled: {
-    color: Colors.textTertiary,
-  },
-
-  // ── secondary — Light surface ─────────────────────────────
   secondary: {
-    backgroundColor: Colors.surfacePrimary,
-    borderColor: Colors.surfaceBorderStrong,
+    backgroundColor: Colors.secondary,
+    borderColor: Colors.secondary,
   },
-  secondaryDisabled: {
-    backgroundColor: Colors.backgroundLayer2,
-    borderColor: Colors.surfaceBorderDim,
+  accent: {
+    backgroundColor: Colors.accent,
+    borderColor: Colors.accent,
   },
-  secondaryLabel: {
-    color: Colors.primary,
-    fontWeight: '600',
-    textAlign: 'center',
+  navy: {
+    backgroundColor: Colors.navy,
+    borderColor: Colors.navy,
   },
-  secondaryLabelDisabled: {
-    color: Colors.textTertiary,
-  },
-
-  // ── outline ───────────────────────────────────────────────
   outline: {
     backgroundColor: Colors.transparent,
     borderColor: Colors.primary,
-    borderWidth: 1.5,
   },
-  outlineDisabled: {
+  outlineBlue: {
     backgroundColor: Colors.transparent,
-    borderColor: Colors.surfaceBorder,
+    borderColor: Colors.secondary,
   },
-  outlineLabel: {
-    color: Colors.primary,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  outlineLabelDisabled: {
-    color: Colors.textTertiary,
-  },
-
-  // ── ghost ─────────────────────────────────────────────────
   ghost: {
     backgroundColor: Colors.transparent,
     borderColor: Colors.transparent,
   },
-  ghostDisabled: {
-    backgroundColor: Colors.transparent,
-    borderColor: Colors.transparent,
-  },
-  ghostLabel: {
-    color: Colors.primary,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  ghostLabelDisabled: {
-    color: Colors.textTertiary,
-  },
-
-  // ── danger ────────────────────────────────────────────────
   danger: {
     backgroundColor: Colors.errorLight,
-    borderColor: 'rgba(229,62,62,0.25)',
+    borderColor: Colors.errorLight,
   },
-  dangerDisabled: {
-    backgroundColor: Colors.backgroundLayer2,
-    borderColor: Colors.surfaceBorder,
+  disabled: {
+    opacity: 0.55,
   },
-  dangerLabel: {
-    color: Colors.error,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  dangerLabelDisabled: {
-    color: Colors.textTertiary,
-  },
-
-  // ── Icon layout ───────────────────────────────────────────
   content: {
-    flexDirection: 'row',
     alignItems: 'center',
+    flexDirection: 'row',
     justifyContent: 'center',
   },
   leftIcon: {
@@ -297,15 +217,42 @@ const styles = StyleSheet.create({
   rightIcon: {
     marginLeft: 8,
   },
-
-  // ── Shared label base ─────────────────────────────────────
   label: {
+    fontWeight: '600',
     textAlign: 'center',
   },
-  labelDefault: {
+  defaultLabel: {
     fontSize: 15,
   },
-  labelSmall: {
+  smallLabel: {
     fontSize: 13,
+  },
+  largeLabel: {
+    fontSize: 17,
+  },
+  primaryLabel: {
+    color: Colors.textWhite,
+  },
+  secondaryLabel: {
+    color: Colors.textWhite,
+  },
+  accentLabel: {
+    color: Colors.navy,
+    fontWeight: '700',
+  },
+  navyLabel: {
+    color: Colors.textWhite,
+  },
+  outlineLabel: {
+    color: Colors.primary,
+  },
+  outlineBlueLabel: {
+    color: Colors.secondary,
+  },
+  ghostLabel: {
+    color: Colors.primary,
+  },
+  dangerLabel: {
+    color: Colors.error,
   },
 });

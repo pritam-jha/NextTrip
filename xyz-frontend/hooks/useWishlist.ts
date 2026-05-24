@@ -14,6 +14,8 @@ import type { PackageListItem } from '../types';
 
 export const wishlistQueryKeys = {
   all: ['wishlist'] as const,
+  ids: () => [...wishlistQueryKeys.all, 'ids'] as const,
+  packages: () => [...wishlistQueryKeys.all, 'packages'] as const,
 } as const;
 
 export interface ToggleWishlistVariables {
@@ -38,7 +40,7 @@ export function useWishlistIds(): UseQueryResult<Set<string>, Error> {
   const setWishlist = useWishlistStore((state) => state.setWishlist);
 
   return useQuery({
-    queryKey: wishlistQueryKeys.all,
+    queryKey: wishlistQueryKeys.ids(),
     enabled: Boolean(session?.access_token),
     queryFn: async () => {
       const response = await apiClient.get<PackageListItem[]>(
@@ -61,6 +63,34 @@ export function useWishlistIds(): UseQueryResult<Set<string>, Error> {
   });
 }
 
+export function useWishlistPackages(): UseQueryResult<PackageListItem[], Error> {
+  const session = useAuthStore((state) => state.session);
+  const setWishlist = useWishlistStore((state) => state.setWishlist);
+
+  return useQuery({
+    queryKey: wishlistQueryKeys.packages(),
+    enabled: Boolean(session?.access_token),
+    queryFn: async () => {
+      const response = await apiClient.get<PackageListItem[]>(
+        '/wishlist',
+        undefined,
+        true
+      );
+
+      if (response.error) {
+        throw new Error(response.error);
+      }
+
+      const packages = response.data ?? [];
+      setWishlist(idsFromPackages(packages));
+
+      return packages;
+    },
+    staleTime: 1 * 60 * 1000,
+    gcTime: Config.queryCacheTimeMs,
+  });
+}
+
 export function useToggleWishlist(): UseMutationResult<
   ToggleWishlistResponse,
   Error,
@@ -71,7 +101,6 @@ export function useToggleWishlist(): UseMutationResult<
   const addToWishlist = useWishlistStore((state) => state.addToWishlist);
   const removeFromWishlist = useWishlistStore((state) => state.removeFromWishlist);
   const setWishlist = useWishlistStore((state) => state.setWishlist);
-  const wishlistedIds = useWishlistStore((state) => state.wishlistedIds);
 
   return useMutation<
     ToggleWishlistResponse,
@@ -99,7 +128,7 @@ export function useToggleWishlist(): UseMutationResult<
     onMutate: async ({ packageId }) => {
       await queryClient.cancelQueries({ queryKey: wishlistQueryKeys.all });
 
-      const previousIds = new Set(wishlistedIds);
+      const previousIds = new Set(useWishlistStore.getState().wishlistedIds);
 
       if (previousIds.has(packageId)) {
         removeFromWishlist(packageId);
@@ -108,7 +137,7 @@ export function useToggleWishlist(): UseMutationResult<
       }
 
       queryClient.setQueryData<Set<string>>(
-        wishlistQueryKeys.all,
+        wishlistQueryKeys.ids(),
         (current) => {
           const next = new Set(current ?? previousIds);
 
@@ -121,14 +150,28 @@ export function useToggleWishlist(): UseMutationResult<
           return next;
         }
       );
+      queryClient.setQueryData<PackageListItem[]>(
+        wishlistQueryKeys.packages(),
+        (current) => {
+          if (!current || !previousIds.has(packageId)) return current;
+          return current.filter((pkg) => pkg.id !== packageId);
+        }
+      );
 
       return { previousIds };
+    },
+    onSuccess: (data) => {
+      if (data.wishlisted) {
+        addToWishlist(data.package_id);
+      } else {
+        removeFromWishlist(data.package_id);
+      }
     },
     onError: (_error, _variables, context) => {
       if (!context) return;
 
       setWishlist([...context.previousIds]);
-      queryClient.setQueryData(wishlistQueryKeys.all, context.previousIds);
+      queryClient.setQueryData(wishlistQueryKeys.ids(), context.previousIds);
     },
     onSettled: () => {
       void queryClient.invalidateQueries({

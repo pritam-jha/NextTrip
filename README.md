@@ -1,4 +1,4 @@
-# XYZ — Travel Package Comparison App
+# NEXTTRP — Travel Package Comparison App
 
 A full-stack travel package comparison app for India.
 
@@ -38,7 +38,7 @@ Look for `inet` under your WiFi adapter.
 
 ### 2. Set up the backend `.env`
 
-Create `xyz-backend/.env` (copy from `xyz-backend/.env.example`):
+Create `NEXTTRP-backend/.env` (copy from `NEXTTRP-backend/.env.example`):
 
 ```env
 PORT=3000
@@ -64,14 +64,14 @@ Replace `<YOUR_LAN_IP>` with the IP from Step 1.
 
 ### 3. Set up the frontend `.env`
 
-Create `xyz-frontend/.env` (copy from `xyz-frontend/.env.example`):
+Create `NEXTTRP-frontend/.env` (copy from `NEXTTRP-frontend/.env.example`):
 
 ```env
 EXPO_PUBLIC_SUPABASE_URL=https://rtyvmyvidkrwmeeeioww.supabase.co
 EXPO_PUBLIC_SUPABASE_ANON_KEY=<get from project owner>
 
 EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME=your-cloud-name
-EXPO_PUBLIC_CLOUDINARY_PRESET=xyz-unsigned
+EXPO_PUBLIC_CLOUDINARY_PRESET=NEXTTRP-unsigned
 
 # Replace with YOUR machine's LAN IP — NOT localhost
 # localhost does not work on a physical Android/iOS device
@@ -86,11 +86,11 @@ Replace `<YOUR_LAN_IP>` with the IP from Step 1.
 
 ```bash
 # Backend
-cd xyz-backend
+cd NEXTTRP-backend
 npm install
 
 # Frontend
-cd xyz-frontend
+cd NEXTTRP-frontend
 npm install
 ```
 
@@ -99,18 +99,18 @@ npm install
 ### 5. Start the backend
 
 ```bash
-cd xyz-backend
+cd NEXTTRP-backend
 npm run dev
 ```
 
-You should see: `XYZ API server listening on port 3000`
+You should see: `NEXTTRP API server listening on port 3000`
 
 ---
 
 ### 6. Start the frontend
 
 ```bash
-cd xyz-frontend
+cd NEXTTRP-frontend
 npx expo start --clear
 ```
 
@@ -133,8 +133,8 @@ The skeleton loaders are the loading state for API calls. If they never resolve,
 ## Project Structure
 
 ```
-XYZ/
-├── xyz-backend/          # Node.js/Express API
+NEXTTRP/
+├── NEXTTRP-backend/          # Node.js/Express API
 │   ├── src/
 │   │   ├── routes/       # API route handlers
 │   │   ├── services/     # Business logic
@@ -142,7 +142,7 @@ XYZ/
 │   │   └── lib/          # Supabase client
 │   └── .env.example
 │
-└── xyz-frontend/         # Expo React Native app
+└── NEXTTRP-frontend/         # Expo React Native app
     ├── app/              # Expo Router screens
     ├── components/       # UI components
     ├── hooks/            # TanStack Query hooks
@@ -156,7 +156,7 @@ XYZ/
 
 ## Environment Variables Reference
 
-### Backend (`xyz-backend/.env`)
+### Backend (`NEXTTRP-backend/.env`)
 
 | Variable | Description |
 |---|---|
@@ -165,7 +165,7 @@ XYZ/
 | `SUPABASE_ANON_KEY` | Supabase JWT anon key (starts with `eyJ...`) |
 | `ALLOWED_ORIGINS` | Comma-separated CORS origins |
 
-### Frontend (`xyz-frontend/.env`)
+### Frontend (`NEXTTRP-frontend/.env`)
 
 | Variable | Description |
 |---|---|

@@ -9,14 +9,12 @@
  *   - "Write a Review" CTA (only when user is eligible)
  */
 
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Animated,
   FlatList,
   Modal,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,

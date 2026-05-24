@@ -3,6 +3,9 @@
  */
 export type UserRole = 'traveler' | 'company_owner' | 'admin';
 
+// FIXED: 2 - The DB enum uses company_owner; "Vendor" remains UI copy only.
+export const VENDOR_ROLE = 'company_owner' as const;
+
 /**
  * Public profile stored for a Supabase-authenticated user.
  */
@@ -155,7 +158,7 @@ export interface PackageDetail extends Package {
   pricing: PackagePricing[];
   company: Pick<
     Company,
-    'id' | 'name' | 'slug' | 'logo_url' | 'is_verified' | 'avg_rating' | 'total_reviews'
+    'id' | 'name' | 'slug' | 'logo_url' | 'is_verified' | 'avg_rating' | 'total_reviews' | 'owner_id'
   >;
   location: Pick<Location, 'id' | 'city' | 'state' | 'region'>;
   category: Pick<Category, 'id' | 'name' | 'label' | 'icon'>;
@@ -225,7 +228,8 @@ export interface ApiResponse<T> {
 export interface AuthenticatedUser {
   id: string;
   email: string;
-  role: string;
+  // FIXED: 1 - Request auth role is typed from public.users.role.
+  role: UserRole;
 }
 
 /**

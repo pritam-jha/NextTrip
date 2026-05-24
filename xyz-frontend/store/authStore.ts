@@ -15,7 +15,30 @@
  */
 
 import { create } from 'zustand';
-import type { AuthState } from '../types';
+import type { Href } from 'expo-router';
+// FIXED: 1 - Auth store helpers route users by the role loaded from public.users.
+import { VENDOR_ROLE, type AuthState, type UserRole } from '../types';
+
+// FIXED: 1 - Shared role selector for callers that need typed role access.
+export const selectUserRole = (state: AuthState): UserRole | undefined =>
+  state.user?.role;
+
+// FIXED: 1 - Central mapping for post-login and cold-start role redirects.
+export const getHomeRouteForRole = (role: UserRole | null | undefined): Href => {
+  // FIXED: 1 - Future admin/vendor route groups are intentional even before screens exist.
+  if (role === 'admin') return '/(admin)' as Href;
+  if (role === VENDOR_ROLE) return '/(vendor)' as Href;
+  return '/(tabs)';
+};
+
+// FIXED: 1 - Compare current Expo Router segment with the role-specific home group.
+export const getHomeGroupForRole = (
+  role: UserRole | null | undefined
+): '(tabs)' | '(vendor)' | '(admin)' => {
+  if (role === 'admin') return '(admin)';
+  if (role === VENDOR_ROLE) return '(vendor)';
+  return '(tabs)';
+};
 
 /**
  * Zustand auth store.
@@ -56,3 +79,7 @@ export const useAuthStore = create<AuthState>((set) => ({
    */
   clearUser: () => set({ user: null, session: null }),
 }));
+
+// FIXED: 7 - Typed role selector for useAuthStore(s => s.user?.role) consumers.
+export const useUserRole = (): UserRole | undefined =>
+  useAuthStore((state) => state.user?.role);

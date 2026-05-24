@@ -98,7 +98,7 @@ function Dots({ count, activeIndex }: DotsProps): React.ReactElement | null {
 export function PhotoGallery({
   images,
   packageTitle,
-  packageId,
+  packageId: _packageId,
 }: PhotoGalleryProps): React.ReactElement {
   const insets = useSafeAreaInsets();
   const [activeIndex, setActiveIndex] = useState(0);

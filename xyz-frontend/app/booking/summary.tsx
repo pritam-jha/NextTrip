@@ -7,6 +7,7 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import {
   Alert,
+  Animated,
   Platform,
   ScrollView,
   StyleSheet,
@@ -27,6 +28,7 @@ import { useCreateBooking, usePriceCalculation } from '../../hooks/useBooking';
 import { useBookingStore } from '../../store/bookingStore';
 import { Colors } from '../../constants/colors';
 import { formatINR } from '../../utils/currency';
+import { useSlideUp } from '../../utils/animations';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -76,7 +78,7 @@ const policyStyles = StyleSheet.create({
 
 // ── Travelers summary ─────────────────────────────────────────────────────────
 
-function TravelersSummaryCard({ travelDate, numTravelers, travelers }: { travelDate: string; numTravelers: number; travelers: Array<{ name: string; age: number; gender: string }>; }): React.ReactElement {
+function TravelersSummaryCard({ travelDate, numTravelers, travelers }: { travelDate: string; numTravelers: number; travelers: { name: string; age: number; gender: string }[]; }): React.ReactElement {
   return (
     <View style={travelerStyles.card}>
       <Text style={travelerStyles.title}>Travelers Summary</Text>
@@ -134,6 +136,7 @@ export default function BookingSummaryScreen(): React.ReactElement {
   const selectedTier = useMemo(() => pkg?.pricing.find((t) => t.id === form?.pricingId) ?? null, [pkg, form?.pricingId]);
   const priceCalc = usePriceCalculation(selectedTier, form?.numTravelers ?? 1, paymentType);
   const { mutate: createBooking, isPending } = useCreateBooking();
+  const slideUp = useSlideUp();
 
   const handlePaymentTypeChange = useCallback((type: 'full' | 'advance') => {
     setPaymentType(type);
@@ -173,6 +176,7 @@ export default function BookingSummaryScreen(): React.ReactElement {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+      <Animated.View style={[styles.flex, slideUp.animatedStyle]}>
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()} accessibilityRole="button" accessibilityLabel="Go back" hitSlop={8}>
           <Ionicons name="chevron-back" size={22} color={Colors.textPrimary} />
@@ -225,6 +229,7 @@ export default function BookingSummaryScreen(): React.ReactElement {
           )}
         </TouchableOpacity>
       </View>
+      </Animated.View>
     </SafeAreaView>
   );
 }
@@ -232,7 +237,8 @@ export default function BookingSummaryScreen(): React.ReactElement {
 // ── Styles ────────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  safeArea: { backgroundColor: Colors.backgroundBase, flex: 1 },
+  safeArea: { backgroundColor: Colors.background, flex: 1 },
+  flex: { flex: 1 },
   centered: { alignItems: 'center', flex: 1, justifyContent: 'center', padding: 32 },
   errorText: { color: Colors.textPrimary, fontSize: 16, fontWeight: '700', lineHeight: 22, marginTop: 12, textAlign: 'center' },
   backBtn: { backgroundColor: Colors.primary, borderRadius: 999, marginTop: 16, paddingHorizontal: 24, paddingVertical: 12 },
@@ -253,7 +259,7 @@ const styles = StyleSheet.create({
   stickyBar: { alignItems: 'center', backgroundColor: Colors.surfacePrimary, borderTopColor: Colors.surfaceBorder, borderTopWidth: 1, flexDirection: 'row', gap: 12, paddingBottom: Platform.OS === 'ios' ? 24 : 16, paddingHorizontal: 16, paddingTop: 12 },
   stickyTotal: { flex: 1 },
   stickyTotalLabel: { color: Colors.textSecondary, fontSize: 12, fontWeight: '600', lineHeight: 16 },
-  stickyTotalValue: { color: Colors.textPrimary, fontSize: 20, fontWeight: '700', lineHeight: 26 },
+  stickyTotalValue: { color: Colors.primary, fontSize: 20, fontWeight: '700', lineHeight: 26 },
   proceedButton: { alignItems: 'center', backgroundColor: Colors.primary, borderRadius: 999, flexDirection: 'row', gap: 6, paddingHorizontal: 20, paddingVertical: 14 },
   proceedButtonDisabled: { backgroundColor: Colors.textTertiary },
   proceedButtonText: { color: Colors.white, fontSize: 15, fontWeight: '700', lineHeight: 20 },

@@ -3,7 +3,7 @@
  * @description Shows result count, sort button, and view toggle row.
  */
 
-import React, { useCallback } from 'react';
+import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 

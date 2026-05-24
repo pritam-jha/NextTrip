@@ -8,7 +8,7 @@
  * `pricingVisible` which is false once the pricing section scrolls off screen.
  */
 
-import React, { useCallback, useEffect, useRef } from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
   Animated,
   Pressable,

@@ -225,6 +225,7 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
     flex: 1,
     fontSize: 22,
+    fontFamily: 'monospace',
     fontWeight: '800',
     letterSpacing: 1,
     lineHeight: 28,

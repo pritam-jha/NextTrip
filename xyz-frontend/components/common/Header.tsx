@@ -1,28 +1,14 @@
 /**
  * @file components/common/Header.tsx
- * @description Floating glass header for Glassmorphism Dark design system.
- *
- * - Dark glass background with dim bottom border
- * - Left: glass circle back button OR teal logo wordmark
- * - Center: title 17px semibold, light text
- * - Right: glass circle icon buttons
- *
- * ✅ All existing props preserved — zero logic changes.
+ * @description NEXTTRP light header.
  */
 
 import React from 'react';
-import {
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-  type ViewStyle,
-} from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View, type ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { Colors } from '../../constants/colors';
-
-// ── Types ─────────────────────────────────────────────────────────────────────
+import { Shadows } from '../../constants/shadows';
 
 export interface HeaderAction {
   icon: React.ComponentProps<typeof Ionicons>['name'];
@@ -40,7 +26,12 @@ export interface HeaderProps {
   logoText?: string;
 }
 
-// ── Component ─────────────────────────────────────────────────────────────────
+const HIT_SLOP = {
+  bottom: 8,
+  left: 8,
+  right: 8,
+  top: 8,
+};
 
 export const Header: React.FC<HeaderProps> = ({
   title,
@@ -49,29 +40,28 @@ export const Header: React.FC<HeaderProps> = ({
   actions = [],
   style,
   showLogo = false,
-  logoText = 'XYZ',
+  logoText = 'NEXTTRP',
 }) => {
-  const handleBack = () => {
+  const handleBack = (): void => {
     if (onBack) {
       onBack();
-    } else {
-      router.back();
+      return;
     }
+    router.back();
   };
 
   return (
     <View style={[styles.header, style]}>
-      {/* Left */}
       <View style={styles.left}>
         {showBack ? (
           <TouchableOpacity
-            style={styles.glassCircleButton}
+            style={[styles.circleButton, Shadows.soft]}
             onPress={handleBack}
             accessibilityRole="button"
             accessibilityLabel="Go back"
-            hitSlop={8}
+            hitSlop={HIT_SLOP}
           >
-            <Ionicons name="chevron-back" size={20} color={Colors.textPrimary} />
+            <Ionicons name="chevron-back" size={20} color={Colors.navy} />
           </TouchableOpacity>
         ) : showLogo ? (
           <Text style={styles.logo}>{logoText}</Text>
@@ -80,7 +70,6 @@ export const Header: React.FC<HeaderProps> = ({
         )}
       </View>
 
-      {/* Center */}
       {title ? (
         <Text style={styles.title} numberOfLines={1}>
           {title}
@@ -89,84 +78,72 @@ export const Header: React.FC<HeaderProps> = ({
         <View style={styles.titlePlaceholder} />
       )}
 
-      {/* Right */}
       <View style={styles.right}>
-        {actions.map((action, index) => (
+        {actions.map((action) => (
           <TouchableOpacity
-            key={index}
-            style={styles.glassCircleButton}
+            key={action.accessibilityLabel}
+            style={[styles.circleButton, Shadows.soft]}
             onPress={action.onPress}
             accessibilityRole="button"
             accessibilityLabel={action.accessibilityLabel}
-            hitSlop={8}
+            hitSlop={HIT_SLOP}
           >
-            <Ionicons name={action.icon} size={20} color={Colors.textPrimary} />
+            <Ionicons name={action.icon} size={20} color={Colors.navy} />
           </TouchableOpacity>
         ))}
-        {actions.length === 0 && <View style={styles.placeholder} />}
+        {actions.length === 0 ? <View style={styles.placeholder} /> : null}
       </View>
     </View>
   );
 };
 
-// ── Styles ────────────────────────────────────────────────────────────────────
-
 const styles = StyleSheet.create({
   header: {
-    flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: Colors.background,
+    flexDirection: 'row',
     justifyContent: 'space-between',
-    backgroundColor: Colors.overlayLight,
-    borderBottomWidth: 0.5,
-    borderBottomColor: 'rgba(255,255,255,0.08)',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
     minHeight: 56,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
   },
   left: {
-    width: 44,
     alignItems: 'flex-start',
     justifyContent: 'center',
+    width: 52,
   },
   right: {
+    alignItems: 'center',
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    minWidth: 44,
     gap: 8,
+    justifyContent: 'flex-end',
+    minWidth: 52,
   },
-  glassCircleButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255,255,255,0.10)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.18)',
+  circleButton: {
     alignItems: 'center',
+    backgroundColor: Colors.backgroundWhite,
+    borderRadius: 18,
+    height: 36,
     justifyContent: 'center',
+    width: 36,
   },
   title: {
+    color: Colors.navy,
     flex: 1,
     fontSize: 17,
     fontWeight: '600',
-    color: Colors.textPrimary,
-    textAlign: 'center',
     marginHorizontal: 8,
-    letterSpacing: 0.2,
+    textAlign: 'center',
   },
   titlePlaceholder: {
     flex: 1,
   },
   logo: {
-    fontSize: 22,
-    fontWeight: '900',
     color: Colors.primary,
-    letterSpacing: 1,
-    textShadowColor: Colors.primaryGlowStrong,
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 10,
+    fontSize: 22,
+    fontWeight: '800',
   },
   placeholder: {
-    width: 44,
+    width: 36,
   },
 });

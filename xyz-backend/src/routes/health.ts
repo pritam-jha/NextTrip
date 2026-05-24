@@ -12,7 +12,7 @@ export const healthRouter = Router();
 
 healthRouter.get('/', (_req, res) => {
   const health: HealthCheck = {
-    service: 'xyz-backend',
+    service: 'nexttrp-backend',
     status: 'ok',
     uptime_seconds: Math.round(process.uptime()),
     timestamp: new Date().toISOString(),

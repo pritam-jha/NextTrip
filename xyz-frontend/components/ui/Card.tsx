@@ -1,25 +1,13 @@
 /**
  * @file components/ui/Card.tsx
- * @description Premium Light 3D floating card.
- *
- * - White surface with subtle border
- * - Multi-layer 3D shadow for genuine depth
- * - Inner top highlight strip (light source simulation)
- * - Press: Animated.spring scale 0.97
- *
- * ✅ All existing props preserved — zero logic changes.
+ * @description NEXTTRP animated card.
  */
 
-import React, { useRef, useCallback } from 'react';
-import {
-  Animated,
-  Pressable,
-  StyleSheet,
-  View,
-  type ViewStyle,
-} from 'react-native';
+import React from 'react';
+import { Animated, Pressable, StyleSheet, View, type ViewStyle } from 'react-native';
 import { Colors } from '../../constants/colors';
 import { Shadows } from '../../constants/shadows';
+import { use3DCard } from '../../utils/animations';
 
 export interface CardProps {
   children: React.ReactNode;
@@ -36,89 +24,32 @@ export const Card: React.FC<CardProps> = ({
   onPress,
   style,
   accessibilityLabel,
-  glowColor,
+  glowColor: _glowColor,
 }) => {
-  const scale = useRef(new Animated.Value(1)).current;
+  const card3D = use3DCard();
 
-  const handlePressIn = useCallback(() => {
-    Animated.spring(scale, {
-      toValue: 0.97,
-      useNativeDriver: true,
-      friction: 8,
-      tension: 100,
-    }).start();
-  }, [scale]);
-
-  const handlePressOut = useCallback(() => {
-    Animated.spring(scale, {
-      toValue: 1,
-      useNativeDriver: true,
-      friction: 8,
-      tension: 100,
-    }).start();
-  }, [scale]);
-
-  const glowShadow: ViewStyle | undefined = glowColor
-    ? {
-        shadowColor: glowColor,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.25,
-        shadowRadius: 16,
-        elevation: 8,
-      }
-    : undefined;
-
-  const cardContent = (
-    <View
-      style={[
-        styles.card,
-        { padding },
-        Shadows.glassCard,
-        glowShadow,
-        style,
-      ]}
-    >
-      {/* Top inner highlight — 3D light source from above */}
-      <View style={styles.topEdge} pointerEvents="none" />
-      {children}
-    </View>
+  return (
+    <Animated.View style={[card3D.animatedStyle]}>
+      <Pressable
+        onPress={onPress}
+        onPressIn={card3D.onPressIn}
+        onPressOut={card3D.onPressOut}
+        disabled={!onPress}
+        accessibilityRole={onPress ? 'button' : 'none'}
+        accessibilityLabel={accessibilityLabel}
+      >
+        <View style={[styles.card, Shadows.card, style, { padding }]}>
+          {children}
+        </View>
+      </Pressable>
+    </Animated.View>
   );
-
-  if (onPress) {
-    return (
-      <Animated.View style={{ transform: [{ scale }] }}>
-        <Pressable
-          onPress={onPress}
-          onPressIn={handlePressIn}
-          onPressOut={handlePressOut}
-          accessibilityRole="button"
-          accessibilityLabel={accessibilityLabel}
-        >
-          {cardContent}
-        </Pressable>
-      </Animated.View>
-    );
-  }
-
-  return cardContent;
 };
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: Colors.surfacePrimary,
+    backgroundColor: Colors.surface,
     borderRadius: 20,
-    borderWidth: 1,
-    borderColor: Colors.surfaceBorder,
     overflow: 'hidden',
-    position: 'relative',
-  },
-  topEdge: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 1,
-    backgroundColor: 'rgba(255,255,255,0.90)',
-    zIndex: 1,
   },
 });

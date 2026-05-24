@@ -5,7 +5,7 @@ import { config } from './config';
 const port = config.PORT;
 
 const server = app.listen(port, () => {
-  console.log(`XYZ API server listening on port ${port}`);
+  console.log(`NEXTTRP API server listening on port ${port}`);
 });
 
 const shutdown = (signal: NodeJS.Signals): void => {

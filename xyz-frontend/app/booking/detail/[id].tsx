@@ -343,7 +343,7 @@ export default function BookingDetailScreen(): React.ReactElement {
 
     try {
       await Share.share({
-        title: 'My XYZ Booking',
+        title: 'My NEXTTRP Booking',
         message:
           `Booking ${booking.booking_reference}\n` +
           `Travel date: ${formatDate(booking.travel_date, true)}\n` +

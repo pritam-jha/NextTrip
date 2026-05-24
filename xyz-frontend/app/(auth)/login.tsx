@@ -1,27 +1,27 @@
 /**
  * @file app/(auth)/login.tsx
- * @description Login screen — clean minimal sage green design.
- * All hooks and functionality preserved.
+ * @description NEXTTRP login screen.
  */
 
 import React, { useRef, useState } from 'react';
 import {
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
 import type { TextInput } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Link } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 
-import { ScreenWrapper } from '../../components/common/ScreenWrapper';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Colors } from '../../constants/colors';
-import { Config } from '../../constants/config';
 import { useSignIn } from '../../hooks/useAuth';
-
-// ── Google icon ───────────────────────────────────────────────────────────────
 
 function GoogleIcon(): React.ReactElement {
   return (
@@ -31,215 +31,230 @@ function GoogleIcon(): React.ReactElement {
   );
 }
 
+export default function LoginScreen(): React.ReactElement {
+  const insets = useSafeAreaInsets();
+  const passwordRef = useRef<TextInput>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const auth = useSignIn();
+  const heroInset = React.useMemo(
+    () => StyleSheet.create({ value: { paddingTop: insets.top + 20 } }).value,
+    [insets.top]
+  );
+  const isBusy = auth.isPending || auth.isGooglePending;
+
+  return (
+    <SafeAreaView style={styles.safeArea} edges={['left', 'right']}>
+      <KeyboardAvoidingView
+        style={styles.keyboard}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={[styles.hero, heroInset]}>
+            <View style={styles.heroGradientEnd} />
+            <Ionicons name="airplane" size={24} color={Colors.textWhite} />
+            <Text style={styles.logoText}>NEXTTRP</Text>
+            <Text style={styles.tagline}>Travel More, Spend Less</Text>
+          </View>
+
+          <View style={styles.content}>
+            <Text style={styles.title} accessibilityRole="header">
+              Welcome back
+            </Text>
+            <Text style={styles.subtitle}>Sign in to continue your journey</Text>
+
+            <View style={styles.form}>
+              <Input
+                label="Email"
+                value={auth.email}
+                onChangeText={auth.setEmail}
+                placeholder="you@example.com"
+                error={auth.errors.email}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                autoComplete="email"
+                returnKeyType="next"
+                onSubmitEditing={() => passwordRef.current?.focus()}
+                editable={!isBusy}
+                leftIcon={<Ionicons name="mail-outline" size={18} color={Colors.primary} />}
+              />
+
+              <Input
+                ref={passwordRef}
+                label="Password"
+                value={auth.password}
+                onChangeText={auth.setPassword}
+                placeholder="Enter your password"
+                secureTextEntry={!showPassword}
+                error={auth.errors.password}
+                autoCapitalize="none"
+                autoCorrect={false}
+                autoComplete="password"
+                returnKeyType="done"
+                onSubmitEditing={auth.submit}
+                editable={!isBusy}
+                leftIcon={<Ionicons name="lock-closed-outline" size={18} color={Colors.primary} />}
+                rightIcon={
+                  <Ionicons
+                    name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                    size={18}
+                    color={Colors.primary}
+                  />
+                }
+                onRightIconPress={() => setShowPassword((current) => !current)}
+              />
+
+              {auth.formError ? (
+                <View style={styles.errorPanel} accessibilityRole="alert">
+                  <Text style={styles.errorText}>{auth.formError}</Text>
+                </View>
+              ) : null}
+
+              <View style={styles.forgotRow}>
+                <Link href="/(auth)/forgot-password" asChild>
+                  <TouchableOpacity accessibilityRole="link" disabled={isBusy}>
+                    <Text style={styles.linkText}>Forgot password?</Text>
+                  </TouchableOpacity>
+                </Link>
+              </View>
+
+              <Button
+                label="Sign In"
+                onPress={auth.submit}
+                loading={auth.isPending}
+                disabled={auth.isGooglePending}
+                fullWidth
+                style={styles.primaryButton}
+              />
+
+              <View style={styles.dividerRow}>
+                <View style={styles.dividerLine} />
+                <Text style={styles.dividerText}>or continue with</Text>
+                <View style={styles.dividerLine} />
+              </View>
+
+              <Button
+                label="Sign in with Google"
+                onPress={auth.signInWithGoogle}
+                loading={auth.isGooglePending}
+                disabled={auth.isPending}
+                variant="outline"
+                leftIcon={<GoogleIcon />}
+                fullWidth
+                style={styles.googleButton}
+                labelStyle={styles.googleButtonText}
+              />
+            </View>
+
+            <View style={styles.footer}>
+              <Text style={styles.footerText}>New to NEXTTRP?</Text>
+              <Link href="/(auth)/signup" asChild>
+                <TouchableOpacity accessibilityRole="link" disabled={isBusy}>
+                  <Text style={styles.footerLink}> Create account</Text>
+                </TouchableOpacity>
+              </Link>
+            </View>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
+  );
+}
+
 const googleStyles = StyleSheet.create({
   badge: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: Colors.surfacePrimary,
     alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: Colors.backgroundWhite,
+    borderColor: Colors.border,
+    borderRadius: 10,
     borderWidth: 1,
-    borderColor: Colors.surfaceBorder,
+    height: 20,
+    justifyContent: 'center',
+    width: 20,
   },
   letter: {
+    color: Colors.secondary,
     fontSize: 12,
-    fontWeight: '700',
-    color: Colors.info,
+    fontWeight: '800',
     lineHeight: 14,
   },
 });
 
-// ── Screen ────────────────────────────────────────────────────────────────────
-
-export default function LoginScreen(): React.ReactElement {
-  const passwordRef = useRef<TextInput>(null);
-  const [showPassword, setShowPassword] = useState(false);
-  const auth = useSignIn();
-
-  const isBusy = auth.isPending || auth.isGooglePending;
-
-  return (
-    <ScreenWrapper scrollable contentStyle={styles.screenContent}>
-      {/* ── Header ── */}
-      <View style={styles.header}>
-        {/* Logo */}
-        <View style={styles.logoWrap}>
-          <Text style={styles.logoText}>{Config.appName}</Text>
-        </View>
-        <Text style={styles.title} accessibilityRole="header">
-          Welcome back
-        </Text>
-        <Text style={styles.subtitle}>
-          Compare trusted travel packages across India.
-        </Text>
-      </View>
-
-      {/* ── Form ── */}
-      <View style={styles.form}>
-        <Input
-          label="Email"
-          value={auth.email}
-          onChangeText={auth.setEmail}
-          placeholder="you@example.com"
-          error={auth.errors.email}
-          keyboardType="email-address"
-          autoCapitalize="none"
-          autoCorrect={false}
-          autoComplete="email"
-          returnKeyType="next"
-          onSubmitEditing={() => passwordRef.current?.focus()}
-          editable={!isBusy}
-        />
-
-        <Input
-          ref={passwordRef}
-          label="Password"
-          value={auth.password}
-          onChangeText={auth.setPassword}
-          placeholder="Enter your password"
-          secureTextEntry={!showPassword}
-          error={auth.errors.password}
-          autoCapitalize="none"
-          autoCorrect={false}
-          autoComplete="password"
-          returnKeyType="done"
-          onSubmitEditing={auth.submit}
-          editable={!isBusy}
-          rightIcon={
-            <Text style={styles.passwordToggle}>
-              {showPassword ? 'Hide' : 'Show'}
-            </Text>
-          }
-          onRightIconPress={() => setShowPassword((prev) => !prev)}
-        />
-
-        {auth.formError ? (
-          <View style={styles.errorPanel} accessibilityRole="alert" accessibilityLiveRegion="polite">
-            <Text style={styles.errorText}>{auth.formError}</Text>
-          </View>
-        ) : null}
-
-        {/* Forgot password */}
-        <View style={styles.forgotRow}>
-          <Link href="/(auth)/forgot-password" asChild>
-            <TouchableOpacity
-              accessibilityRole="link"
-              accessibilityLabel="Forgot password"
-              disabled={isBusy}
-            >
-              <Text style={styles.linkText}>Forgot password?</Text>
-            </TouchableOpacity>
-          </Link>
-        </View>
-
-        {/* Sign in button */}
-        <Button
-          label="Sign in"
-          onPress={auth.submit}
-          loading={auth.isPending}
-          disabled={auth.isGooglePending}
-          fullWidth
-          style={styles.primaryButton}
-        />
-
-        {/* Divider */}
-        <View style={styles.dividerRow}>
-          <View style={styles.dividerLine} />
-          <Text style={styles.dividerText}>or continue with</Text>
-          <View style={styles.dividerLine} />
-        </View>
-
-        {/* Google OAuth */}
-        <Button
-          label="Sign in with Google"
-          onPress={auth.signInWithGoogle}
-          loading={auth.isGooglePending}
-          disabled={auth.isPending}
-          variant="secondary"
-          leftIcon={<GoogleIcon />}
-          fullWidth
-        />
-      </View>
-
-      {/* ── Footer ── */}
-      <View style={styles.footer}>
-        <Text style={styles.footerText}>Don't have an account?</Text>
-        <Link href="/(auth)/signup" asChild>
-          <TouchableOpacity
-            accessibilityRole="link"
-            accessibilityLabel="Sign up"
-            disabled={isBusy}
-          >
-            <Text style={styles.footerLink}> Sign up</Text>
-          </TouchableOpacity>
-        </Link>
-      </View>
-    </ScreenWrapper>
-  );
-}
-
-// ── Styles ────────────────────────────────────────────────────────────────────
-
 const styles = StyleSheet.create({
-  screenContent: {
-    justifyContent: 'center',
+  safeArea: {
+    backgroundColor: Colors.background,
+    flex: 1,
   },
-  header: {
-    paddingTop: 32,
+  keyboard: {
+    flex: 1,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+  },
+  hero: {
+    alignItems: 'center',
+    backgroundColor: Colors.navy,
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
+    overflow: 'hidden',
     paddingBottom: 32,
-    alignItems: 'center',
+    paddingHorizontal: 20,
+    position: 'relative',
   },
-  logoWrap: {
-    width: 76,
-    height: 76,
-    borderRadius: 22,
-    backgroundColor: Colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 24,
-    // 3D shadow
-    shadowColor: Colors.primary,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.35,
-    shadowRadius: 20,
-    elevation: 12,
+  heroGradientEnd: {
+    backgroundColor: Colors.navyMedium,
+    bottom: 0,
+    height: 96,
+    left: 0,
+    opacity: 0.72,
+    position: 'absolute',
+    right: 0,
   },
   logoText: {
-    fontSize: 22,
+    color: Colors.primary,
+    fontSize: 32,
     fontWeight: '800',
-    color: Colors.white,
-    letterSpacing: -0.5,
+    marginTop: 8,
+  },
+  tagline: {
+    color: Colors.textWhite,
+    fontSize: 13,
+    marginTop: 4,
+    opacity: 0.7,
+  },
+  content: {
+    backgroundColor: Colors.background,
+    paddingHorizontal: 20,
+    paddingVertical: 28,
   },
   title: {
-    color: Colors.textPrimary,
-    fontSize: 28,
-    fontWeight: '800',
-    marginBottom: 8,
-    textAlign: 'center',
-    letterSpacing: -0.5,
+    color: Colors.navy,
+    fontSize: 26,
+    fontWeight: '700',
   },
   subtitle: {
     color: Colors.textSecondary,
-    fontSize: 15,
-    lineHeight: 22,
-    textAlign: 'center',
+    fontSize: 14,
+    marginTop: 6,
   },
   form: {
-    flexGrow: 1,
-  },
-  passwordToggle: {
-    color: Colors.primary,
-    fontSize: 13,
-    fontWeight: '600',
+    marginTop: 24,
   },
   errorPanel: {
     backgroundColor: Colors.errorLight,
+    borderColor: Colors.error,
     borderRadius: 12,
+    borderWidth: 1,
     marginBottom: 14,
     padding: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(229,62,62,0.20)',
   },
   errorText: {
     color: Colors.error,
@@ -256,23 +271,29 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   primaryButton: {
-    marginTop: 2,
+    marginTop: 4,
   },
   dividerRow: {
     alignItems: 'center',
     flexDirection: 'row',
-    marginVertical: 20,
+    marginVertical: 22,
   },
   dividerLine: {
-    backgroundColor: Colors.surfaceBorder,
+    backgroundColor: Colors.divider,
     flex: 1,
     height: 1,
   },
   dividerText: {
-    color: Colors.textTertiary,
+    color: Colors.textLight,
     fontSize: 13,
     fontWeight: '500',
     paddingHorizontal: 12,
+  },
+  googleButton: {
+    borderColor: Colors.navy,
+  },
+  googleButtonText: {
+    color: Colors.navy,
   },
   footer: {
     alignItems: 'center',

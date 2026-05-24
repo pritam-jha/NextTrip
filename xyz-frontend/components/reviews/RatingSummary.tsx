@@ -88,7 +88,7 @@ export interface RatingSummaryProps {
 }
 
 export function RatingSummary({ summary }: RatingSummaryProps): React.ReactElement {
-  const categories: Array<{ label: string; value: number }> = [
+  const categories: { label: string; value: number }[] = [
     { label: 'Guide', value: summary.guide },
     { label: 'Hotel', value: summary.hotel },
     { label: 'Food', value: summary.food },

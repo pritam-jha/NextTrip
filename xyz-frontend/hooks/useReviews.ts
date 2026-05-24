@@ -15,7 +15,6 @@ import {
   useQueryClient,
 } from '@tanstack/react-query';
 import type {
-  UseInfiniteQueryResult,
   UseMutationResult,
   UseQueryResult,
 } from '@tanstack/react-query';
@@ -46,12 +45,23 @@ export const reviewQueryKeys = {
 
 const REVIEWS_PAGE_LIMIT = 10;
 
-export interface UsePackageReviewsReturn
-  extends UseInfiniteQueryResult<PaginatedResponse<Review>, Error> {
+export interface UsePackageReviewsReturn {
   /** Flat list of all loaded reviews across pages */
   reviews: Review[];
   /** Total review count from the first page response */
   totalCount: number;
+  /** Whether the first page is loading */
+  isLoading: boolean;
+  /** Whether there was an error */
+  isError: boolean;
+  /** Whether the next page is being fetched */
+  isFetchingNextPage: boolean;
+  /** Whether there are more pages */
+  hasNextPage: boolean;
+  /** Fetch the next page */
+  fetchNextPage: () => void;
+  /** Refetch all pages */
+  refetch: () => void;
 }
 
 /**
@@ -89,7 +99,16 @@ export function usePackageReviews(packageId: string): UsePackageReviewsReturn {
 
   const totalCount = query.data?.pages[0]?.total ?? 0;
 
-  return { ...query, reviews, totalCount };
+  return {
+    reviews,
+    totalCount,
+    isLoading: query.isLoading,
+    isError: query.isError,
+    isFetchingNextPage: query.isFetchingNextPage,
+    hasNextPage: query.hasNextPage ?? false,
+    fetchNextPage: () => { void query.fetchNextPage(); },
+    refetch: () => { void query.refetch(); },
+  };
 }
 
 // ── useReviewEligibility ──────────────────────────────────────────────────────
@@ -128,7 +147,7 @@ export function useReviewEligibility(
 
 // ── useSubmitReview ───────────────────────────────────────────────────────────
 
-export interface SubmitReviewVariables extends CreateReviewInput {}
+export type SubmitReviewVariables = CreateReviewInput;
 
 /**
  * Submits a new review via POST /api/v1/reviews.

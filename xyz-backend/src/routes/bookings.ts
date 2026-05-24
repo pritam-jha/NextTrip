@@ -144,6 +144,8 @@ bookingsRouter.post('/create', async (req, res, next) => {
       special_requests: parsed.data.special_requests,
       traveler_details: parsed.data.traveler_details,
       payment_type: parsed.data.payment_type,
+      // FIXED: 3 - Preserve the validated booking payload shape expected by CreateBookingInput.
+      primary_contact: parsed.data.primary_contact,
     });
 
     return success(res, result, 201);

@@ -1,7 +1,10 @@
 import { AppError, ERROR_MESSAGES } from '../constants/errors';
-import { supabase } from '../lib/supabase';
+// FIXED: 4 - Wishlist business logic runs through the trusted backend client.
+import { supabaseAdmin } from '../lib/supabase';
 import type { PackageListItem } from '../types';
 import { getPackageListItemsByIds } from './packageService';
+
+type WishlistMutationResult = { wishlisted: boolean; package_id: string };
 
 const isRecord = (value: unknown): value is Record<string, unknown> => {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -18,7 +21,7 @@ const throwDatabaseError = (operation: string, dbError: unknown): never => {
 };
 
 const ensureActivePackageExists = async (packageId: string): Promise<void> => {
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from('packages')
     .select('id')
     .eq('id', packageId)
@@ -38,7 +41,7 @@ const ensureActivePackageExists = async (packageId: string): Promise<void> => {
  * Fetches the authenticated user's active wishlisted packages.
  */
 export const getUserWishlist = async (userId: string): Promise<PackageListItem[]> => {
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from('wishlists')
     .select('package_id')
     .eq('user_id', userId)
@@ -57,13 +60,67 @@ export const getUserWishlist = async (userId: string): Promise<PackageListItem[]
 };
 
 /**
+ * Adds an active package to the authenticated user's wishlist.
+ */
+// FIXED: 6 - Wishlist writes are exposed through backend API functions, not frontend Supabase writes.
+export const addPackageToWishlist = async (
+  userId: string,
+  packageId: string,
+): Promise<WishlistMutationResult> => {
+  await ensureActivePackageExists(packageId);
+
+  const { error } = await supabaseAdmin.from('wishlists').upsert(
+    {
+      user_id: userId,
+      package_id: packageId,
+    },
+    {
+      onConflict: 'user_id,package_id',
+    },
+  );
+
+  if (error !== null) {
+    throwDatabaseError('addPackageToWishlist', error);
+  }
+
+  return {
+    wishlisted: true,
+    package_id: packageId,
+  };
+};
+
+/**
+ * Removes a package from the authenticated user's wishlist.
+ */
+// FIXED: 6 - Frontend delete behavior is now mediated by the backend API.
+export const removePackageFromWishlist = async (
+  userId: string,
+  packageId: string,
+): Promise<WishlistMutationResult> => {
+  const { error } = await supabaseAdmin
+    .from('wishlists')
+    .delete()
+    .eq('user_id', userId)
+    .eq('package_id', packageId);
+
+  if (error !== null) {
+    throwDatabaseError('removePackageFromWishlist', error);
+  }
+
+  return {
+    wishlisted: false,
+    package_id: packageId,
+  };
+};
+
+/**
  * Toggles a package in the authenticated user's wishlist and returns the new state.
  */
 export const toggleWishlist = async (
   userId: string,
   packageId: string,
-): Promise<{ wishlisted: boolean; package_id: string }> => {
-  const { data: existing, error: lookupError } = await supabase
+): Promise<WishlistMutationResult> => {
+  const { data: existing, error: lookupError } = await supabaseAdmin
     .from('wishlists')
     .select('id')
     .eq('user_id', userId)
@@ -75,40 +132,10 @@ export const toggleWishlist = async (
   }
 
   if (existing !== null) {
-    const { error: deleteError } = await supabase
-      .from('wishlists')
-      .delete()
-      .eq('user_id', userId)
-      .eq('package_id', packageId);
-
-    if (deleteError !== null) {
-      throwDatabaseError('toggleWishlist.delete', deleteError);
-    }
-
-    return {
-      wishlisted: false,
-      package_id: packageId,
-    };
+    // FIXED: 6 - Reuse the backend delete path used by the frontend API wrapper.
+    return removePackageFromWishlist(userId, packageId);
   }
 
-  await ensureActivePackageExists(packageId);
-
-  const { error: upsertError } = await supabase.from('wishlists').upsert(
-    {
-      user_id: userId,
-      package_id: packageId,
-    },
-    {
-      onConflict: 'user_id,package_id',
-    },
-  );
-
-  if (upsertError !== null) {
-    throwDatabaseError('toggleWishlist.upsert', upsertError);
-  }
-
-  return {
-    wishlisted: true,
-    package_id: packageId,
-  };
+  // FIXED: 6 - Reuse the backend insert/upsert path used by the frontend API wrapper.
+  return addPackageToWishlist(userId, packageId);
 };

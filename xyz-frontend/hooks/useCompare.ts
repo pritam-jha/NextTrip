@@ -9,6 +9,7 @@ import { Config } from '../constants/config';
 import {
   useCompareStore as useRawCompareStore,
 } from '../store/compareStore';
+import { getPackageDestinationImage } from '../utils/packageImages';
 import type { ComparePackage, PackageListItem } from '../types';
 
 export type AddToCompareResult = 'added' | 'already_added' | 'tray_full';
@@ -27,7 +28,7 @@ function toComparePackage(pkg: PackageListItem): ComparePackage {
   return {
     id: pkg.id,
     title: pkg.title,
-    cover_image: pkg.cover_image,
+    cover_image: pkg.cover_image ?? getPackageDestinationImage(pkg),
     duration_days: pkg.duration_days,
     duration_nights: pkg.duration_nights,
     avg_rating: pkg.avg_rating,

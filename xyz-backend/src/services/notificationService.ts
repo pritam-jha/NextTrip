@@ -1,5 +1,6 @@
 import { AppError, ERROR_MESSAGES } from '../constants/errors';
-import { supabase } from '../lib/supabase';
+// FIXED: 4 - Notification writes and user-scoped reads use the backend admin client.
+import { supabaseAdmin } from '../lib/supabase';
 import type {
   Notification,
   NotificationRelatedType,
@@ -92,7 +93,7 @@ export const createNotification = async (
   relatedId?: string,
   relatedType?: NotificationRelatedType,
 ): Promise<Notification> => {
-  const { data: inserted, error } = await supabase
+  const { data: inserted, error } = await supabaseAdmin
     .from('notifications')
     .insert({
       user_id: userId,
@@ -119,7 +120,7 @@ export const createNotification = async (
 export const getUserNotifications = async (
   userId: string,
 ): Promise<Notification[]> => {
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from('notifications')
     .select('*')
     .eq('user_id', userId)
@@ -139,7 +140,7 @@ export const markNotificationAsRead = async (
   userId: string,
   notificationId: string,
 ): Promise<Notification> => {
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from('notifications')
     .update({ is_read: true })
     .eq('id', notificationId)
@@ -164,7 +165,7 @@ export const markNotificationAsRead = async (
 export const markAllNotificationsAsRead = async (
   userId: string,
 ): Promise<{ updated_count: number }> => {
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAdmin
     .from('notifications')
     .update({ is_read: true })
     .eq('user_id', userId)
@@ -184,7 +185,7 @@ export const markAllNotificationsAsRead = async (
  * Counts unread notifications for callers that need a lightweight badge value.
  */
 export const getUnreadCount = async (userId: string): Promise<number> => {
-  const { count, error } = await supabase
+  const { count, error } = await supabaseAdmin
     .from('notifications')
     .select('id', { count: 'exact', head: true })
     .eq('user_id', userId)

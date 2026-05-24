@@ -4,16 +4,18 @@
  */
 
 import React, { useEffect } from 'react';
-import { Stack } from 'expo-router';
+import { Stack, useSegments } from 'expo-router';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
+import * as ScreenCapture from 'expo-screen-capture';
 import { router } from 'expo-router';
 
 import { supabase } from '../lib/supabase';
 import { getProfile } from '../lib/api/users';
 import { getWishlistIds } from '../lib/api/wishlist';
-import { useAuthStore } from '../store/authStore';
+// FIXED: 1 - Root auth guard routes users by the DB-backed role in authStore.user.
+import { getHomeGroupForRole, getHomeRouteForRole, useAuthStore } from '../store/authStore';
 import { useWishlistStore } from '../store/wishlistStore';
 import { FullScreenLoader } from '../components/ui/LoadingSpinner';
 import { Config } from '../constants/config';
@@ -41,20 +43,48 @@ function AppLayout(): React.ReactElement {
   const isLoading = useAuthStore((state) => state.isLoading);
   const user = useAuthStore((state) => state.user);
   const setWishlist = useWishlistStore((state) => state.setWishlist);
+  const segments = useSegments();
+  const rootSegment = segments[0] as string | undefined;
 
-  // ── Navigate when auth state changes ──────────────────────────────────────
-  // index.tsx only runs once on mount. After that, navigation must be
-  // triggered imperatively whenever user logs in or out.
   useEffect(() => {
-    // Don't navigate while the initial session check is still running
+    void ScreenCapture.allowScreenCaptureAsync().catch((error) => {
+      console.warn('[AppLayout] Failed to allow screen capture:', error);
+    });
+  }, []);
+
+  // ── Post-login / post-logout navigation guard ─────────────────────────────
+  // index.tsx handles the initial cold-start redirect (single source of truth).
+  // This effect handles SUBSEQUENT auth changes — e.g. user logs in while on
+  // the login screen, or session expires while the user is on a tabs screen.
+  //
+  // By checking which *group* the user is currently in, we avoid the double-
+  // navigation race that occurs when both this effect and index.tsx's <Redirect>
+  // fire simultaneously on cold start.
+  useEffect(() => {
     if (isLoading) return;
 
-    if (user) {
-      router.replace('/(tabs)');
-    } else {
+    const isInAuthGroup = rootSegment === '(auth)';
+    // FIXED: 1 - Treat all role app groups as protected shells.
+    const isInProtectedGroup =
+      rootSegment === '(tabs)' || rootSegment === '(vendor)' || rootSegment === '(admin)';
+
+    if (user && isInAuthGroup) {
+      // Logged in while on an auth screen — send to the main app.
+      router.replace(getHomeRouteForRole(user.role));
+      return;
+    }
+
+    if (user && isInProtectedGroup && rootSegment !== getHomeGroupForRole(user.role)) {
+      // FIXED: 1 - Prevent cross-role access between traveler, vendor, and admin shells.
+      router.replace(getHomeRouteForRole(user.role));
+      return;
+    }
+
+    if (!user && isInProtectedGroup) {
+      // Session expired or logged out while inside the app — send to login.
       router.replace('/(auth)/login');
     }
-  }, [user, isLoading]);
+  }, [isLoading, rootSegment, user]);
 
   useEffect(() => {
     async function resolveInitialSession(): Promise<void> {
@@ -112,7 +142,7 @@ function AppLayout(): React.ReactElement {
   }, [setLoading, setSession, setWishlist]);
 
   if (isLoading) {
-    return <FullScreenLoader message="Loading XYZ..." />;
+    return <FullScreenLoader message="Loading NEXTTRP..." />;
   }
 
   return (
@@ -122,7 +152,7 @@ function AppLayout(): React.ReactElement {
         <Stack.Screen name="index" />
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="package" />
+        <Stack.Screen name="package/[id]" />
         <Stack.Screen name="booking" />
         <Stack.Screen name="review" />
         <Stack.Screen name="compare" />

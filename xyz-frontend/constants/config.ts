@@ -9,14 +9,22 @@ import Constants from 'expo-constants';
 
 // ── Environment variables (validated at startup) ─────────────────────────────
 
+const env = {
+  EXPO_PUBLIC_SUPABASE_URL: process.env.EXPO_PUBLIC_SUPABASE_URL,
+  EXPO_PUBLIC_SUPABASE_ANON_KEY: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
+  EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME:
+    process.env.EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME,
+  EXPO_PUBLIC_CLOUDINARY_PRESET: process.env.EXPO_PUBLIC_CLOUDINARY_PRESET,
+  EXPO_PUBLIC_API_BASE_URL: process.env.EXPO_PUBLIC_API_BASE_URL,
+} as const;
+
 /**
  * Reads a required environment variable.
  * Throws at startup if the variable is missing, preventing silent failures
  * in production builds.
  */
-function requireEnv(key: string): string {
-  // Expo managed workflow exposes EXPO_PUBLIC_* vars via process.env
-  const value = process.env[key];
+function requireEnv(key: keyof typeof env): string {
+  const value = env[key];
   if (!value) {
     throw new Error(
       `[Config] Missing required environment variable: ${key}. ` +
@@ -39,7 +47,7 @@ export const Config = {
   apiBaseUrl: requireEnv('EXPO_PUBLIC_API_BASE_URL'),
 
   // ── App metadata ──────────────────────────────────────────
-  appName: 'XYZ',
+  appName: 'NEXTTRP',
   appVersion: Constants.expoConfig?.version ?? '1.0.0',
 
   // ── Pagination ────────────────────────────────────────────

@@ -1,6 +1,8 @@
 import { AppError, ERROR_MESSAGES } from '../constants/errors';
-import { supabase } from '../lib/supabase';
-import type { User, UserRole } from '../types';
+// FIXED: 4 - Authenticated profile writes use the explicitly named admin client.
+import { supabaseAdmin } from '../lib/supabase';
+// FIXED: 2 - Use the shared vendor role constant instead of hardcoding the role value.
+import { VENDOR_ROLE, type User, type UserRole } from '../types';
 import type { UpdateProfileInput } from '../utils/validation';
 
 const isRecord = (value: unknown): value is Record<string, unknown> => {
@@ -21,7 +23,8 @@ const readNullableString = (record: Record<string, unknown>, key: string): strin
 
 const readRole = (record: Record<string, unknown>): UserRole => {
   const role = readString(record, 'role');
-  return role === 'company_owner' || role === 'admin' ? role : 'traveler';
+  // FIXED: 2 - Keep DB logic aligned with the company_owner enum value.
+  return role === VENDOR_ROLE || role === 'admin' ? role : 'traveler';
 };
 
 const throwDatabaseError = (operation: string, dbError: unknown): never => {
@@ -49,7 +52,7 @@ const mapUser = (value: unknown): User => {
  * Fetches a public user profile by Supabase auth user id.
  */
 export const getProfile = async (userId: string): Promise<User> => {
-  const { data, error } = await supabase.from('users').select('*').eq('id', userId).maybeSingle();
+  const { data, error } = await supabaseAdmin.from('users').select('*').eq('id', userId).maybeSingle();
 
   if (error !== null) {
     throwDatabaseError('getProfile', error);
@@ -80,7 +83,7 @@ export const updateProfile = async (userId: string, data: UpdateProfileInput): P
 
   updates.updated_at = new Date().toISOString();
 
-  const { data: updatedUser, error } = await supabase
+  const { data: updatedUser, error } = await supabaseAdmin
     .from('users')
     .update(updates)
     .eq('id', userId)

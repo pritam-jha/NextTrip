@@ -14,7 +14,8 @@
 
 import React from 'react';
 import { Redirect } from 'expo-router';
-import { useAuthStore } from '../store/authStore';
+// FIXED: 1 - Cold-start routing uses the DB-backed role stored in authStore.
+import { getHomeRouteForRole, useAuthStore } from '../store/authStore';
 import { FullScreenLoader } from '../components/ui/LoadingSpinner';
 
 /**
@@ -35,7 +36,8 @@ export default function Index(): React.ReactElement {
 
   // Session resolved — route to the correct group
   if (user) {
-    return <Redirect href="/(tabs)" />;
+    // FIXED: 1 - Traveler, company owner, and admin users land in their own app group.
+    return <Redirect href={getHomeRouteForRole(user.role)} />;
   }
 
   return <Redirect href="/(auth)/login" />;

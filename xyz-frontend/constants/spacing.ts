@@ -1,9 +1,10 @@
 /**
  * @file constants/spacing.ts
- * @description Spacing scale for XYZ 3D Glassmorphism Dark design system.
+ * @description NEXTTRP spacing scale.
  */
 
 export const Spacing = {
+  xxs: 2,
   xs: 4,
   sm: 8,
   md: 12,
@@ -11,5 +12,8 @@ export const Spacing = {
   xl: 20,
   xxl: 24,
   xxxl: 32,
-  section: 48,
+  page: 20,
+
+  // Compatibility alias.
+  section: 32,
 } as const;

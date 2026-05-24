@@ -25,6 +25,7 @@ import { useBookingDetail } from '../../hooks/useBooking';
 import { useBookingStore } from '../../store/bookingStore';
 import { Colors } from '../../constants/colors';
 import { formatINR } from '../../utils/currency';
+import { useSlideUp } from '../../utils/animations';
 
 // ── Animated checkmark ────────────────────────────────────────────────────────
 
@@ -106,11 +107,18 @@ const nextStyles = StyleSheet.create({
 // ── Main screen ───────────────────────────────────────────────────────────────
 
 export default function ConfirmationScreen(): React.ReactElement {
-  const { bookingId } = useLocalSearchParams<{ bookingId: string }>();
-  const id = Array.isArray(bookingId) ? bookingId[0] : (bookingId ?? '');
+  const params = useLocalSearchParams();
+  const rawBookingId = params.bookingId;
+  const id =
+    typeof rawBookingId === 'string'
+      ? rawBookingId
+      : Array.isArray(rawBookingId)
+      ? rawBookingId[0] ?? ''
+      : '';
   const form = useBookingStore((s) => s.form);
   const clearForm = useBookingStore((s) => s.clearForm);
   const { data: booking, isLoading } = useBookingDetail(id);
+  const slideUp = useSlideUp();
 
   useEffect(() => {
     return () => { clearForm(); };
@@ -121,8 +129,8 @@ export default function ConfirmationScreen(): React.ReactElement {
     const travelDate = new Date(booking.travel_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
     try {
       await Share.share({
-        message: `🎉 My trip is confirmed!\n\nBooking Reference: ${booking.booking_reference}\nTravel Date: ${travelDate}\nTravelers: ${booking.num_travelers}\nAmount: ${formatINR(booking.total_amount)}\n\nBooked via XYZ — India's travel comparison app`,
-        title: 'My XYZ Booking',
+        message: `My trip is confirmed!\n\nBooking Reference: ${booking.booking_reference}\nTravel Date: ${travelDate}\nTravelers: ${booking.num_travelers}\nAmount: ${formatINR(booking.total_amount)}\n\nBooked via NEXTTRP - Travel More, Spend Less`,
+        title: 'My NEXTTRP Booking',
       });
     } catch { /* User cancelled */ }
   }, [booking]);
@@ -144,6 +152,7 @@ export default function ConfirmationScreen(): React.ReactElement {
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
       <BookingProgressBar currentStep={4} />
 
+      <Animated.View style={[styles.flex, slideUp.animatedStyle]}>
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* Hero */}
         <View style={styles.heroSection}>
@@ -181,6 +190,7 @@ export default function ConfirmationScreen(): React.ReactElement {
 
         <View style={styles.bottomSpacer} />
       </ScrollView>
+      </Animated.View>
     </SafeAreaView>
   );
 }
@@ -188,7 +198,8 @@ export default function ConfirmationScreen(): React.ReactElement {
 // ── Styles ────────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  safeArea: { backgroundColor: Colors.backgroundBase, flex: 1 },
+  safeArea: { backgroundColor: Colors.background, flex: 1 },
+  flex: { flex: 1 },
   centered: { alignItems: 'center', flex: 1, justifyContent: 'center', padding: 32 },
   loadingText: { color: Colors.textSecondary, fontSize: 15, fontWeight: '500', lineHeight: 22, marginTop: 12 },
   scrollView: { flex: 1 },

@@ -1,415 +1,254 @@
 /**
  * @file app/package/[id].tsx
- * @description Package detail screen.
- *
- * Layout: ScrollView with all sections stacked vertically.
- * StickyActionBar is absolutely positioned outside the ScrollView
- * and animates in once the pricing section scrolls off screen.
- *
- * State owned here:
- * - selectedTierId: which pricing tier the user has tapped
- * - pricingVisible: drives the sticky bar slide-in animation
- * - toast: "Enquire Now" coming-soon message
+ * @description NEXTTRP package detail screen.
  */
 
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   Animated,
+  Image,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
-import { PhotoGallery } from '../../components/package/PhotoGallery';
-import { PackageHeader } from '../../components/package/PackageHeader';
-import { PricingSection } from '../../components/package/PricingSection';
-import { HighlightsSection } from '../../components/package/HighlightsSection';
-import { ItinerarySection } from '../../components/package/ItinerarySection';
-import { InclusionsSection } from '../../components/package/InclusionsSection';
-import { AmenitiesSection } from '../../components/package/AmenitiesSection';
-import { CompanySection } from '../../components/package/CompanySection';
-import { StickyActionBar } from '../../components/package/StickyActionBar';
+import { Badge } from '../../components/ui/Badge';
+import { Button } from '../../components/ui/Button';
+import { SkeletonLoader } from '../../components/ui/SkeletonLoader';
+import { StarRating } from '../../components/ui/StarRating';
 import { ReviewsList } from '../../components/reviews/ReviewsList';
 import { Toast } from '../../components/ui/Toast';
 import { usePackageDetail } from '../../hooks/usePackage';
 import { useCompare } from '../../hooks/useCompare';
+import { useToggleWishlist } from '../../hooks/useWishlist';
+import { useWishlistStore } from '../../store/wishlistStore';
 import { Colors } from '../../constants/colors';
-import type { PackageDetail } from '../../types';
+import { Shadows } from '../../constants/shadows';
+import { useHeartBounce, useSlideUp } from '../../utils/animations';
+import type { PackageDetail, PackageListItem } from '../../types';
 
-// ── Skeleton ──────────────────────────────────────────────────────────────────
+const PHOTO_HEIGHT = 300;
 
-function useShimmer(): Animated.Value {
-  const opacity = useRef(new Animated.Value(0.4)).current;
-  useEffect(() => {
-    const anim = Animated.loop(
-      Animated.sequence([
-        Animated.timing(opacity, { toValue: 1, duration: 700, useNativeDriver: true }),
-        Animated.timing(opacity, { toValue: 0.4, duration: 700, useNativeDriver: true }),
-      ])
-    );
-    anim.start();
-    return () => anim.stop();
-  }, [opacity]);
-  return opacity;
+const currencyFormatter = new Intl.NumberFormat('en-IN', {
+  currency: 'INR',
+  maximumFractionDigits: 0,
+  style: 'currency',
+});
+
+function formatPrice(amount: number): string {
+  return currencyFormatter.format(amount);
 }
 
-function SkeletonBlock({
-  height,
-  width = '100%',
-  borderRadius = 8,
-  marginBottom = 10,
-}: {
-  height: number;
-  width?: string | number;
-  borderRadius?: number;
-  marginBottom?: number;
-}): React.ReactElement {
-  const opacity = useShimmer();
-  return (
-    <Animated.View
-      style={[
-        skeletonStyles.block,
-        { height, width, borderRadius, marginBottom, opacity },
-      ]}
-      accessibilityElementsHidden
-    />
-  );
+function buildCompareItem(pkg: PackageDetail): PackageListItem {
+  return {
+    id: pkg.id,
+    company_id: pkg.company_id,
+    location_id: pkg.location_id,
+    category_id: pkg.category_id,
+    title: pkg.title,
+    slug: pkg.slug,
+    description: pkg.description,
+    highlights: pkg.highlights,
+    duration_days: pkg.duration_days,
+    duration_nights: pkg.duration_nights,
+    min_group_size: pkg.min_group_size,
+    max_group_size: pkg.max_group_size,
+    inclusions: pkg.inclusions,
+    exclusions: pkg.exclusions,
+    amenities: pkg.amenities,
+    status: pkg.status,
+    is_featured: pkg.is_featured,
+    is_bestseller: pkg.is_bestseller,
+    avg_rating: pkg.avg_rating,
+    review_count: pkg.review_count,
+    total_bookings: pkg.total_bookings,
+    created_at: pkg.created_at,
+    updated_at: pkg.updated_at,
+    cover_image: pkg.images.find((image) => image.is_cover)?.url ?? pkg.images[0]?.url ?? null,
+    company: {
+      id: pkg.company.id,
+      name: pkg.company.name,
+      logo_url: pkg.company.logo_url,
+      is_verified: pkg.company.is_verified,
+    },
+    location: {
+      id: pkg.location.id,
+      city: pkg.location.city,
+      state: pkg.location.state,
+    },
+    category: {
+      id: pkg.category.id,
+      name: pkg.category.name,
+      label: pkg.category.label,
+      icon: pkg.category.icon,
+    },
+    pricing: pkg.pricing.map((tier) => ({
+      base_price: tier.base_price,
+      discounted_price: tier.discounted_price,
+      currency: tier.currency,
+    })),
+    badges: [],
+  };
 }
 
 function DetailSkeleton(): React.ReactElement {
   return (
-    <View style={skeletonStyles.container}>
-      {/* Gallery */}
-      <SkeletonBlock height={260} borderRadius={0} marginBottom={0} />
-      {/* Header */}
-      <View style={skeletonStyles.section}>
-        <SkeletonBlock height={14} width="40%" marginBottom={12} />
-        <SkeletonBlock height={28} width="90%" marginBottom={8} />
-        <SkeletonBlock height={20} width="60%" marginBottom={12} />
-        <SkeletonBlock height={16} width="50%" marginBottom={8} />
-        <SkeletonBlock height={16} width="70%" marginBottom={0} />
-      </View>
-      {/* Pricing */}
-      <View style={skeletonStyles.section}>
-        <SkeletonBlock height={20} width="50%" marginBottom={14} />
-        <View style={skeletonStyles.row}>
-          <SkeletonBlock height={120} width={160} marginBottom={0} />
-          <View style={{ width: 12 }} />
-          <SkeletonBlock height={120} width={160} marginBottom={0} />
-        </View>
-      </View>
-      {/* Highlights */}
-      <View style={skeletonStyles.section}>
-        <SkeletonBlock height={20} width="50%" marginBottom={14} />
-        {[0, 1, 2, 3].map((i) => (
-          <SkeletonBlock key={i} height={16} width={`${75 + (i % 3) * 8}%`} marginBottom={10} />
-        ))}
-      </View>
-      {/* Itinerary */}
-      <View style={skeletonStyles.section}>
-        <SkeletonBlock height={20} width="60%" marginBottom={14} />
-        {[0, 1, 2].map((i) => (
-          <SkeletonBlock key={i} height={52} marginBottom={8} />
-        ))}
+    <View style={styles.skeletonRoot}>
+      <SkeletonLoader height={PHOTO_HEIGHT} borderRadius={0} />
+      <View style={styles.skeletonContent}>
+        <SkeletonLoader width="40%" height={14} />
+        <SkeletonLoader width="90%" height={28} style={styles.skeletonGap} />
+        <SkeletonLoader width="70%" height={18} style={styles.skeletonGap} />
+        <SkeletonLoader width="100%" height={90} style={styles.skeletonGapLarge} />
       </View>
     </View>
   );
 }
 
-const skeletonStyles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.backgroundBase,
-  },
-  section: {
-    backgroundColor: Colors.surfacePrimary,
-    borderTopColor: Colors.surfaceBorder,
-    borderTopWidth: 1,
-    padding: 16,
-    paddingTop: 20,
-  },
-  row: {
-    flexDirection: 'row',
-  },
-  block: {
-    backgroundColor: Colors.backgroundLayer2,
-  },
-});
-
-// ── Error states ──────────────────────────────────────────────────────────────
-
-function NotFoundState(): React.ReactElement {
-  return (
-    <SafeAreaView style={errorStyles.safeArea} edges={['top', 'left', 'right']}>
-      <View style={errorStyles.container}>
-        <Ionicons name="map-outline" size={48} color={Colors.textTertiary} />
-        <Text style={errorStyles.title} numberOfLines={1}>
-          Package not found
-        </Text>
-        <Text style={errorStyles.subtitle} numberOfLines={2}>
-          This package may have been removed or is no longer available.
-        </Text>
-        <Pressable
-          style={errorStyles.button}
-          onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)')}
-          accessibilityRole="button"
-          accessibilityLabel="Go back"
-        >
-          <Text style={errorStyles.buttonText} numberOfLines={1}>Go Back</Text>
-        </Pressable>
-      </View>
-    </SafeAreaView>
-  );
-}
-
 function ErrorState({ onRetry }: { onRetry: () => void }): React.ReactElement {
   return (
-    <SafeAreaView style={errorStyles.safeArea} edges={['top', 'left', 'right']}>
-      <View style={errorStyles.container}>
-        <Ionicons name="cloud-offline-outline" size={48} color={Colors.textTertiary} />
-        <Text style={errorStyles.title} numberOfLines={1}>
-          Something went wrong
-        </Text>
-        <Text style={errorStyles.subtitle} numberOfLines={2}>
-          We couldn't load this package. Please check your connection and try again.
-        </Text>
-        <Pressable
-          style={errorStyles.button}
-          onPress={onRetry}
-          accessibilityRole="button"
-          accessibilityLabel="Retry"
-        >
-          <Text style={errorStyles.buttonText} numberOfLines={1}>Retry</Text>
-        </Pressable>
-        <Pressable
-          style={errorStyles.backLink}
-          onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)')}
-          accessibilityRole="button"
-          accessibilityLabel="Go back"
-          hitSlop={8}
-        >
-          <Text style={errorStyles.backLinkText} numberOfLines={1}>Go Back</Text>
-        </Pressable>
+    <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+      <View style={styles.centered}>
+        <Ionicons name="cloud-offline-outline" size={48} color={Colors.textLight} />
+        <Text style={styles.errorTitle}>Something went wrong</Text>
+        <Text style={styles.errorSubtitle}>We couldn't load this package.</Text>
+        <Button label="Retry" onPress={onRetry} />
+        <Button label="Go Back" variant="ghost" onPress={() => router.back()} style={styles.backLinkButton} />
       </View>
     </SafeAreaView>
   );
 }
 
-const errorStyles = StyleSheet.create({
-  safeArea: {
-    backgroundColor: Colors.backgroundBase,
-    flex: 1,
-  },
-  container: {
-    alignItems: 'center',
-    flex: 1,
-    justifyContent: 'center',
-    paddingHorizontal: 32,
-  },
-  title: {
-    color: Colors.textPrimary,
-    fontSize: 20,
-    fontWeight: '700',
-    lineHeight: 26,
-    marginBottom: 8,
-    marginTop: 16,
-    textAlign: 'center',
-  },
-  subtitle: {
-    color: Colors.textSecondary,
-    fontSize: 14,
-    fontWeight: '500',
-    lineHeight: 22,
-    marginBottom: 24,
-    textAlign: 'center',
-  },
-  button: {
-    alignItems: 'center',
-    backgroundColor: Colors.primary,
-    borderRadius: 14,
-    paddingHorizontal: 32,
-    paddingVertical: 14,
-    shadowColor: Colors.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.30,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  buttonText: {
-    color: Colors.white,
-    fontSize: 15,
-    fontWeight: '700',
-    lineHeight: 20,
-  },
-  backLink: {
-    marginTop: 16,
-  },
-  backLinkText: {
-    color: Colors.primary,
-    fontSize: 14,
-    fontWeight: '600',
-    lineHeight: 20,
-  },
-});
+type DetailTab = 'overview' | 'itinerary' | 'inclusions' | 'reviews';
 
-// ── Detail content ────────────────────────────────────────────────────────────
-
-interface DetailContentProps {
-  pkg: PackageDetail;
-}
-
-function DetailContent({ pkg }: DetailContentProps): React.ReactElement {
+function DetailContent({ pkg }: { pkg: PackageDetail }): React.ReactElement {
+  const insets = useSafeAreaInsets();
+  const slideUp = useSlideUp();
+  const heart = useHeartBounce();
   const { addToCompare, removeFromCompare, isInCompare, isTrayFull } = useCompare();
+  const isWishlisted = useWishlistStore((state) => state.isWishlisted(pkg.id));
+  const { mutate: toggleWishlist, isPending: isWishlistPending } = useToggleWishlist();
+  const [activeTab, setActiveTab] = useState<DetailTab>('overview');
+  const [toast, setToast] = useState({ visible: false, message: '', type: 'info' as 'success' | 'error' | 'info' });
 
-  // Selected pricing tier — default to first active tier
-  const [selectedTierId, setSelectedTierId] = useState<string | null>(
-    () => pkg.pricing[0]?.id ?? null
-  );
-
-  // Whether the pricing section is still visible (drives sticky bar)
-  const [pricingVisible, setPricingVisible] = useState(true);
-
-  // Toast state
-  const [toast, setToast] = useState<{
-    visible: boolean;
-    message: string;
-    type: 'success' | 'error' | 'info';
-  }>({ visible: false, message: '', type: 'info' });
-
-  // Pricing section layout Y position in the scroll view
-  const pricingSectionY = useRef(0);
-
-  const selectedTier = useMemo(
-    () => pkg.pricing.find((t) => t.id === selectedTierId) ?? null,
-    [pkg.pricing, selectedTierId]
-  );
-
+  const heroImage = pkg.images.find((image) => image.is_cover)?.url ?? pkg.images[0]?.url ?? null;
+  const tier = pkg.pricing[0] ?? null;
+  const price = tier ? tier.discounted_price ?? tier.base_price : null;
   const inCompare = isInCompare(pkg.id);
-
-  // ── Handlers ────────────────────────────────────────────────────────────────
-
-  const handleSelectTier = useCallback(
-    (tier: PackageDetail['pricing'][number]) => {
-      setSelectedTierId(tier.id);
-    },
-    []
+  const compareDisabled = isTrayFull && !inCompare;
+  const topControlsStyle = useMemo(
+    () => StyleSheet.create({ value: { top: insets.top + 12 } }).value,
+    [insets.top]
   );
 
-  const handleScroll = useCallback(
-    (e: { nativeEvent: { contentOffset: { y: number } } }) => {
-      const scrollY = e.nativeEvent.contentOffset.y;
-      // Pricing section scrolls off when scroll passes its bottom edge (~300px below its top)
-      const pricingBottom = pricingSectionY.current + 300;
-      setPricingVisible(scrollY < pricingBottom);
-    },
-    []
-  );
+  const handleShare = useCallback(async () => {
+    try {
+      await Share.share({
+        message: `Check out ${pkg.title} on NEXTTRP - Travel More, Spend Less`,
+        title: pkg.title,
+      });
+    } catch {
+      // Share cancelled.
+    }
+  }, [pkg.title]);
 
-  const handleComparePress = useCallback(() => {
+  const handleWishlist = useCallback(() => {
+    heart.trigger();
+    toggleWishlist({ packageId: pkg.id });
+  }, [heart, pkg.id, toggleWishlist]);
+
+  const handleCompare = useCallback(() => {
     if (inCompare) {
       removeFromCompare(pkg.id);
       return;
     }
-
-    // Build a PackageListItem-compatible shape from PackageDetail
-    const listItem = {
-      id: pkg.id,
-      company_id: pkg.company_id,
-      location_id: pkg.location_id,
-      category_id: pkg.category_id,
-      title: pkg.title,
-      slug: pkg.slug,
-      description: pkg.description,
-      highlights: pkg.highlights,
-      duration_days: pkg.duration_days,
-      duration_nights: pkg.duration_nights,
-      min_group_size: pkg.min_group_size,
-      max_group_size: pkg.max_group_size,
-      inclusions: pkg.inclusions,
-      exclusions: pkg.exclusions,
-      amenities: pkg.amenities,
-      status: pkg.status,
-      is_featured: pkg.is_featured,
-      is_bestseller: pkg.is_bestseller,
-      avg_rating: pkg.avg_rating,
-      review_count: pkg.review_count,
-      total_bookings: pkg.total_bookings,
-      created_at: pkg.created_at,
-      updated_at: pkg.updated_at,
-      cover_image: pkg.images.find((i) => i.is_cover)?.url ?? pkg.images[0]?.url ?? null,
-      company: {
-        id: pkg.company.id,
-        name: pkg.company.name,
-        logo_url: pkg.company.logo_url,
-        is_verified: pkg.company.is_verified,
-      },
-      location: {
-        id: pkg.location.id,
-        city: pkg.location.city,
-        state: pkg.location.state,
-      },
-      category: {
-        id: pkg.category.id,
-        name: pkg.category.name,
-        label: pkg.category.label,
-        icon: pkg.category.icon,
-      },
-      pricing: pkg.pricing.map((p) => ({
-        base_price: p.base_price,
-        discounted_price: p.discounted_price,
-        currency: p.currency,
-      })),
-      badges: [],
-    };
-
-    const result = addToCompare(listItem);
-
+    const result = addToCompare(buildCompareItem(pkg));
     if (result === 'tray_full') {
       setToast({
         visible: true,
         message: 'Compare tray is full. Remove a package to add another.',
         type: 'info',
       });
-    } else if (result === 'added') {
-      setToast({
-        visible: true,
-        message: `${pkg.title} added to compare.`,
-        type: 'success',
-      });
     }
   }, [addToCompare, inCompare, pkg, removeFromCompare]);
 
-  const handleEnquirePress = useCallback(() => {
-    if (!selectedTier) {
-      setToast({
-        visible: true,
-        message: 'Please select a pricing tier first.',
-        type: 'info',
-      });
-      return;
+  const handleBook = useCallback(() => {
+    router.push({ pathname: '/booking/[packageId]' as never, params: { packageId: pkg.id } });
+  }, [pkg.id]);
+
+  const renderTabContent = (): React.ReactElement => {
+    if (activeTab === 'itinerary') {
+      return (
+        <View style={styles.tabPanel}>
+          {pkg.itineraries.length > 0 ? (
+            pkg.itineraries.map((item) => (
+              <View key={item.id} style={styles.timelineItem}>
+                <View style={styles.timelineBadge}>
+                  <Text style={styles.timelineBadgeText}>{item.day_number}</Text>
+                </View>
+                <View style={styles.timelineTextWrap}>
+                  <Text style={styles.timelineTitle}>{item.title}</Text>
+                  {item.description ? <Text style={styles.bodyText}>{item.description}</Text> : null}
+                </View>
+              </View>
+            ))
+          ) : (
+            <Text style={styles.bodyText}>Itinerary details will be shared by the operator.</Text>
+          )}
+        </View>
+      );
     }
-    router.push({
-      pathname: '/booking/[packageId]' as never,
-      params: { packageId: pkg.id },
-    });
-  }, [pkg.id, selectedTier]);
 
-  const handleToastHide = useCallback(() => {
-    setToast((prev) => ({ ...prev, visible: false }));
-  }, []);
+    if (activeTab === 'inclusions') {
+      return (
+        <View style={styles.tabPanel}>
+          <Text style={styles.panelTitle}>Included</Text>
+          {pkg.inclusions.map((item) => (
+            <View key={item} style={styles.bulletRow}>
+              <Ionicons name="checkmark-circle" size={17} color={Colors.success} />
+              <Text style={styles.bodyText}>{item}</Text>
+            </View>
+          ))}
+          <Text style={styles.panelTitle}>Excluded</Text>
+          {pkg.exclusions.map((item) => (
+            <View key={item} style={styles.bulletRow}>
+              <Ionicons name="close-circle" size={17} color={Colors.error} />
+              <Text style={styles.bodyText}>{item}</Text>
+            </View>
+          ))}
+        </View>
+      );
+    }
 
-  // ── Render ──────────────────────────────────────────────────────────────────
+    if (activeTab === 'reviews') {
+      return <ReviewsList packageId={pkg.id} />;
+    }
+
+    return (
+      <View style={styles.tabPanel}>
+        <Text style={styles.bodyText}>
+          {pkg.description || 'A curated travel experience from a verified operator.'}
+        </Text>
+        {pkg.highlights.length > 0 ? (
+          <>
+            <Text style={styles.panelTitle}>Highlights</Text>
+            {pkg.highlights.map((item) => (
+              <View key={item} style={styles.bulletRow}>
+                <Ionicons name="sparkles-outline" size={17} color={Colors.primary} />
+                <Text style={styles.bodyText}>{item}</Text>
+              </View>
+            ))}
+          </>
+        ) : null}
+      </View>
+    );
+  };
 
   return (
     <View style={styles.flex}>
@@ -417,105 +256,177 @@ function DetailContent({ pkg }: DetailContentProps): React.ReactElement {
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
-        scrollEventThrottle={16}
-        onScroll={handleScroll}
-        keyboardShouldPersistTaps="handled"
       >
-        {/* 1. Photo gallery — no horizontal padding, full bleed */}
-        <PhotoGallery
-          images={pkg.images}
-          packageTitle={pkg.title}
-          packageId={pkg.id}
-        />
-
-        {/* 2. Package header */}
-        <PackageHeader pkg={pkg} />
-
-        {/* 3. Pricing — capture Y position for sticky bar trigger */}
-        <View
-          onLayout={(e) => {
-            pricingSectionY.current = e.nativeEvent.layout.y;
-          }}
-        >
-          <PricingSection
-            pricing={pkg.pricing}
-            selectedTierId={selectedTierId}
-            onSelectTier={handleSelectTier}
-          />
+        <View style={styles.photoWrap}>
+          {heroImage ? (
+            <Image source={{ uri: heroImage }} style={styles.heroImage} resizeMode="cover" />
+          ) : (
+            <View style={styles.photoFallback}>
+              <Ionicons name="image-outline" size={48} color={Colors.textLight} />
+            </View>
+          )}
+          <View style={[styles.topControls, topControlsStyle]}>
+            <Pressable
+              style={[styles.circleButton, Shadows.soft]}
+              onPress={() => router.back()}
+              accessibilityRole="button"
+              accessibilityLabel="Go back"
+            >
+              <Ionicons name="chevron-back" size={22} color={Colors.navy} />
+            </Pressable>
+            <View style={styles.topRightControls}>
+              <Pressable
+                style={[styles.circleButton, Shadows.soft]}
+                onPress={() => void handleShare()}
+                accessibilityRole="button"
+                accessibilityLabel="Share package"
+              >
+                <Ionicons name="share-outline" size={20} color={Colors.navy} />
+              </Pressable>
+              <Animated.View style={heart.animatedStyle}>
+                <Pressable
+                  style={[styles.circleButton, Shadows.soft]}
+                  onPress={handleWishlist}
+                  disabled={isWishlistPending}
+                  accessibilityRole="button"
+                  accessibilityLabel={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
+                  accessibilityState={{ checked: isWishlisted, disabled: isWishlistPending }}
+                >
+                  <Ionicons
+                    name={isWishlisted ? 'heart' : 'heart-outline'}
+                    size={20}
+                    color={isWishlisted ? Colors.error : Colors.navy}
+                  />
+                </Pressable>
+              </Animated.View>
+            </View>
+          </View>
+          <View style={styles.imageCounter}>
+            <Text style={styles.imageCounterText}>1 / {Math.max(pkg.images.length, 1)}</Text>
+          </View>
         </View>
 
-        {/* 4. Highlights */}
-        <HighlightsSection highlights={pkg.highlights} />
+        <Animated.View style={[styles.contentCard, slideUp.animatedStyle]}>
+          <View style={styles.badgesRow}>
+            {pkg.is_featured ? <Badge type="FEATURED" /> : null}
+            {pkg.is_bestseller ? <Badge type="BESTSELLER" /> : null}
+            {pkg.company.is_verified ? <Badge type="VERIFIED" /> : null}
+          </View>
 
-        {/* 5. Itinerary */}
-        <ItinerarySection itineraries={pkg.itineraries} />
+          <Text style={styles.title}>{pkg.title}</Text>
 
-        {/* 6. Inclusions & Exclusions */}
-        <InclusionsSection
-          inclusions={pkg.inclusions}
-          exclusions={pkg.exclusions}
-        />
+          <View style={styles.locationRatingRow}>
+            <View style={styles.locationRow}>
+              <Ionicons name="location" size={15} color={Colors.primary} />
+              <Text style={styles.locationText}>
+                {pkg.location.city}, {pkg.location.state}
+              </Text>
+            </View>
+            <View style={styles.ratingGroup}>
+              <StarRating rating={pkg.avg_rating} size={14} />
+              <Text style={styles.ratingValue}>{pkg.avg_rating.toFixed(1)}</Text>
+              <Text style={styles.reviewCount}>({pkg.review_count})</Text>
+            </View>
+          </View>
 
-        {/* 7. Amenities */}
-        <AmenitiesSection amenities={pkg.amenities} />
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.statsPills}
+          >
+            <View style={styles.statPill}>
+              <Ionicons name="time-outline" size={14} color={Colors.primary} />
+              <Text style={styles.statPillText}>{pkg.duration_days} Days</Text>
+            </View>
+            <View style={styles.statPill}>
+              <Ionicons name="people-outline" size={14} color={Colors.primary} />
+              <Text style={styles.statPillText}>{pkg.min_group_size}-{pkg.max_group_size} People</Text>
+            </View>
+            <View style={styles.statPill}>
+              <Ionicons name="pricetag-outline" size={14} color={Colors.primary} />
+              <Text style={styles.statPillText}>{pkg.category.label}</Text>
+            </View>
+          </ScrollView>
 
-        {/* 8. Company */}
-        <CompanySection company={pkg.company} />
+          <View style={styles.tabs}>
+            {DETAIL_TABS.map((tab) => {
+              const active = activeTab === tab.key;
+              return (
+                <Pressable
+                  key={tab.key}
+                  style={styles.tabButton}
+                  onPress={() => setActiveTab(tab.key)}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: active }}
+                >
+                  <Text style={[styles.tabText, active && styles.tabTextActive]}>
+                    {tab.label}
+                  </Text>
+                  <View style={[styles.tabUnderline, active && styles.tabUnderlineActive]} />
+                </Pressable>
+              );
+            })}
+          </View>
 
-        {/* 9. Reviews & Ratings */}
-        <ReviewsList packageId={pkg.id} />
-
-        {/* Bottom padding so last section clears the sticky bar */}
-        <View style={styles.bottomPadding} />
+          {renderTabContent()}
+        </Animated.View>
       </ScrollView>
 
-      {/* 9. Sticky action bar */}
-      <StickyActionBar
-        selectedTier={selectedTier}
-        pricingVisible={pricingVisible}
-        isTrayFull={isTrayFull}
-        isInCompare={inCompare}
-        onComparePress={handleComparePress}
-        onEnquirePress={handleEnquirePress}
-      />
+      <View style={[styles.stickyBottom, Shadows.soft]}>
+        <View style={styles.bottomPrice}>
+          <Text style={styles.stickyPrice}>{price !== null ? formatPrice(price) : 'On request'}</Text>
+          <Text style={styles.stickyPerPerson}>per person</Text>
+        </View>
+        <Button
+          label="Compare"
+          variant="outline"
+          onPress={handleCompare}
+          disabled={compareDisabled}
+          size="small"
+          style={styles.compareButton}
+        />
+        <Button
+          label="Book Now"
+          variant="navy"
+          onPress={handleBook}
+          size="small"
+          style={styles.bookButton}
+        />
+      </View>
 
-      {/* Toast */}
       <Toast
         visible={toast.visible}
         message={toast.message}
         type={toast.type}
-        onHide={handleToastHide}
+        onHide={() => setToast((current) => ({ ...current, visible: false }))}
       />
     </View>
   );
 }
 
-// ── Screen root ───────────────────────────────────────────────────────────────
+const DETAIL_TABS: { key: DetailTab; label: string }[] = [
+  { key: 'overview', label: 'Overview' },
+  { key: 'itinerary', label: 'Itinerary' },
+  { key: 'inclusions', label: 'Inclusions' },
+  { key: 'reviews', label: 'Reviews' },
+];
 
 export default function PackageDetailScreen(): React.ReactElement {
-  const { id } = useLocalSearchParams<{ id: string }>();
-  const packageId = Array.isArray(id) ? id[0] : (id ?? '');
-
-  const { data, isLoading, isError, error, refetch } =
-    usePackageDetail(packageId);
+  const params = useLocalSearchParams();
+  const rawId = params.id;
+  const packageId =
+    typeof rawId === 'string' ? rawId : Array.isArray(rawId) ? rawId[0] ?? '' : '';
+  const { data, isLoading, isError, refetch } = usePackageDetail(packageId);
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+      <SafeAreaView style={styles.safeArea} edges={['left', 'right']}>
         <DetailSkeleton />
       </SafeAreaView>
     );
   }
 
   if (isError || !data) {
-    const isNotFound =
-      error?.message?.toLowerCase().includes('not found') ||
-      error?.message?.includes('404');
-
-    if (isNotFound) {
-      return <NotFoundState />;
-    }
-
     return <ErrorState onRetry={() => void refetch()} />;
   }
 
@@ -526,11 +437,9 @@ export default function PackageDetailScreen(): React.ReactElement {
   );
 }
 
-// ── Styles ────────────────────────────────────────────────────────────────────
-
 const styles = StyleSheet.create({
   safeArea: {
-    backgroundColor: Colors.backgroundBase,
+    backgroundColor: Colors.background,
     flex: 1,
   },
   flex: {
@@ -540,9 +449,265 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    flexGrow: 1,
+    paddingBottom: 116,
   },
-  bottomPadding: {
-    height: 120,
+  photoWrap: {
+    backgroundColor: Colors.backgroundSoft,
+    height: PHOTO_HEIGHT,
+    position: 'relative',
+    width: '100%',
+  },
+  heroImage: {
+    height: '100%',
+    width: '100%',
+  },
+  photoFallback: {
+    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'center',
+  },
+  topControls: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    left: 16,
+    position: 'absolute',
+    right: 16,
+  },
+  topRightControls: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  circleButton: {
+    alignItems: 'center',
+    backgroundColor: Colors.backgroundWhite,
+    borderRadius: 20,
+    height: 40,
+    justifyContent: 'center',
+    width: 40,
+  },
+  imageCounter: {
+    backgroundColor: Colors.navy,
+    borderRadius: 999,
+    bottom: 38,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    position: 'absolute',
+    right: 16,
+  },
+  imageCounterText: {
+    color: Colors.textWhite,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  contentCard: {
+    backgroundColor: Colors.surface,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    marginTop: -24,
+    padding: 20,
+  },
+  badgesRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 12,
+  },
+  title: {
+    color: Colors.navy,
+    fontSize: 22,
+    fontWeight: '700',
+    lineHeight: 29,
+  },
+  locationRatingRow: {
+    gap: 8,
+    marginTop: 10,
+  },
+  locationRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 5,
+  },
+  locationText: {
+    color: Colors.textSecondary,
+    flex: 1,
+    fontSize: 14,
+  },
+  ratingGroup: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 4,
+  },
+  ratingValue: {
+    color: Colors.navy,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  reviewCount: {
+    color: Colors.textLight,
+    fontSize: 13,
+  },
+  statsPills: {
+    gap: 8,
+    paddingTop: 16,
+  },
+  statPill: {
+    alignItems: 'center',
+    backgroundColor: Colors.primaryLight,
+    borderRadius: 999,
+    flexDirection: 'row',
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  statPillText: {
+    color: Colors.primary,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  tabs: {
+    borderBottomColor: Colors.divider,
+    borderBottomWidth: 1,
+    flexDirection: 'row',
+    marginTop: 20,
+  },
+  tabButton: {
+    alignItems: 'center',
+    flex: 1,
+    paddingTop: 2,
+  },
+  tabText: {
+    color: Colors.textSecondary,
+    fontSize: 14,
+    fontWeight: '600',
+    paddingBottom: 10,
+  },
+  tabTextActive: {
+    color: Colors.primary,
+  },
+  tabUnderline: {
+    backgroundColor: Colors.transparent,
+    borderRadius: 2,
+    height: 3,
+    width: '70%',
+  },
+  tabUnderlineActive: {
+    backgroundColor: Colors.primary,
+  },
+  tabPanel: {
+    paddingTop: 16,
+  },
+  bodyText: {
+    color: Colors.textSecondary,
+    flex: 1,
+    fontSize: 14,
+    lineHeight: 22,
+  },
+  panelTitle: {
+    color: Colors.navy,
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 10,
+    marginTop: 16,
+  },
+  bulletRow: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 10,
+  },
+  timelineItem: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 14,
+  },
+  timelineBadge: {
+    alignItems: 'center',
+    backgroundColor: Colors.primary,
+    borderRadius: 14,
+    height: 28,
+    justifyContent: 'center',
+    width: 28,
+  },
+  timelineBadgeText: {
+    color: Colors.textWhite,
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  timelineTextWrap: {
+    flex: 1,
+  },
+  timelineTitle: {
+    color: Colors.navy,
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  stickyBottom: {
+    alignItems: 'center',
+    backgroundColor: Colors.surface,
+    borderTopColor: Colors.divider,
+    borderTopWidth: 1,
+    bottom: 0,
+    flexDirection: 'row',
+    gap: 10,
+    left: 0,
+    paddingBottom: 22,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    position: 'absolute',
+    right: 0,
+  },
+  bottomPrice: {
+    flex: 1,
+  },
+  stickyPrice: {
+    color: Colors.primary,
+    fontSize: 22,
+    fontWeight: '800',
+  },
+  stickyPerPerson: {
+    color: Colors.textLight,
+    fontSize: 11,
+  },
+  compareButton: {
+    minWidth: 92,
+  },
+  bookButton: {
+    minWidth: 104,
+  },
+  skeletonRoot: {
+    flex: 1,
+  },
+  skeletonContent: {
+    padding: 20,
+  },
+  skeletonGap: {
+    marginTop: 12,
+  },
+  skeletonGapLarge: {
+    marginTop: 18,
+  },
+  centered: {
+    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+  },
+  errorTitle: {
+    color: Colors.navy,
+    fontSize: 20,
+    fontWeight: '700',
+    marginTop: 16,
+  },
+  errorSubtitle: {
+    color: Colors.textSecondary,
+    fontSize: 14,
+    marginBottom: 20,
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  backLinkButton: {
+    marginTop: 8,
   },
 });

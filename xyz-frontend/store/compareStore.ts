@@ -66,7 +66,7 @@ export const useCompareStore = create<CompareState>()(
         get().compareItems.some((item) => item.id === packageId),
     }),
     {
-      name: 'xyz-compare-storage',
+      name: 'nexttrp-compare-storage',
       storage: createJSONStorage(() => AsyncStorage),
     }
   )

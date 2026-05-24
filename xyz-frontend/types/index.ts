@@ -1,6 +1,6 @@
 /**
  * @file types/index.ts
- * @description Central type definitions for the XYZ travel app.
+ * @description Central type definitions for the NEXTTRP travel app.
  * All interfaces are defined here and imported across the codebase
  * to ensure a single source of truth for data shapes.
  */
@@ -14,6 +14,12 @@ import type { Session } from '@supabase/supabase-js';
 /**
  * Represents a registered user profile, extending Supabase auth.users.
  */
+// FIXED: 1 - Frontend users carry the same role enum stored in public.users.role.
+export type UserRole = 'traveler' | 'company_owner' | 'admin';
+
+// FIXED: 2 - The DB enum uses company_owner; reserve "Vendor" for UI labels.
+export const VENDOR_ROLE = 'company_owner' as const;
+
 export interface User {
   /** UUID from auth.users */
   id: string;
@@ -27,6 +33,9 @@ export interface User {
   city: string | null;
   /** User's state (Indian state) */
   state: string | null;
+  /** Authorization role from public.users.role */
+  // FIXED: 1 - Auth routing reads this role after login/profile hydration.
+  role: UserRole;
   /** ISO timestamp of account creation */
   created_at: string;
 }
@@ -296,14 +305,26 @@ export interface AuthState {
 export interface WishlistState {
   /** Set of package IDs the user has wishlisted (for O(1) lookup) */
   wishlistedIds: Set<string>;
+  /** Set of destination IDs the user has saved locally */
+  wishlistedDestinationIds: Set<string>;
+  /** Destination metadata needed to render locally saved destinations */
+  wishlistedDestinations: Location[];
   /** Add a package ID to the local wishlist cache */
   addToWishlist: (packageId: string) => void;
   /** Remove a package ID from the local wishlist cache */
   removeFromWishlist: (packageId: string) => void;
+  /** Add a destination to the local wishlist cache */
+  addDestinationToWishlist: (destination: Location) => void;
+  /** Remove a destination from the local wishlist cache */
+  removeDestinationFromWishlist: (destinationId: string) => void;
+  /** Toggle a destination in the local wishlist cache */
+  toggleDestinationWishlist: (destination: Location) => void;
   /** Replace the entire wishlist cache (used on initial load) */
   setWishlist: (packageIds: string[]) => void;
   /** Check if a package is wishlisted */
   isWishlisted: (packageId: string) => boolean;
+  /** Check if a destination is wishlisted */
+  isDestinationWishlisted: (destinationId: string) => boolean;
 }
 
 /**
@@ -512,6 +533,8 @@ export interface PackageDetail {
     is_verified: boolean;
     avg_rating: number;
     total_reviews: number;
+    /** UUID of the Supabase auth user who owns this company. Used for "Manage Photos" visibility. */
+    owner_id: string;
   };
   location: {
     id: string;

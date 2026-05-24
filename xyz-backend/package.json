@@ -1,7 +1,7 @@
 {
-  "name": "xyz-backend",
+  "name": "nexttrp-backend",
   "version": "1.0.0",
-  "description": "Node.js backend for XYZ travel package comparison app.",
+  "description": "Node.js backend for NEXTTRP travel package comparison app.",
   "main": "dist/server.js",
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",

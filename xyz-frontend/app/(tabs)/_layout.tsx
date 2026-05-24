@@ -1,7 +1,6 @@
 /**
  * @file app/(tabs)/_layout.tsx
- * @description Bottom tab navigator — Premium Light 3D design.
- * White tab bar with navy active icons, subtle top border, 3D elevation.
+ * @description NEXTTRP bottom tab navigator.
  */
 
 import React from 'react';
@@ -22,10 +21,11 @@ interface TabIconProps {
 
 function TabIcon({ focused, outlineName, filledName }: TabIconProps): React.ReactElement {
   return (
-    <View style={[styles.iconWrap, focused && styles.iconWrapActive]}>
+    <View style={styles.iconStack}>
+      <View style={[styles.activeDot, focused && styles.activeDotVisible]} />
       <Ionicons
         name={focused ? filledName : outlineName}
-        size={22}
+        size={23}
         color={focused ? Colors.tabActive : Colors.tabInactive}
       />
     </View>
@@ -38,9 +38,9 @@ export default function TabsLayout(): React.ReactElement {
       <Tabs
         screenOptions={{
           headerShown: false,
-          tabBarShowLabel: false,
           tabBarActiveTintColor: Colors.tabActive,
           tabBarInactiveTintColor: Colors.tabInactive,
+          tabBarLabelStyle: styles.label,
           tabBarStyle: styles.tabBar,
         }}
       >
@@ -49,11 +49,7 @@ export default function TabsLayout(): React.ReactElement {
           options={{
             title: 'Home',
             tabBarIcon: ({ focused }) => (
-              <TabIcon
-                focused={focused}
-                outlineName="home-outline"
-                filledName="home"
-              />
+              <TabIcon focused={focused} outlineName="home-outline" filledName="home" />
             ),
           }}
         />
@@ -62,11 +58,7 @@ export default function TabsLayout(): React.ReactElement {
           options={{
             title: 'Search',
             tabBarIcon: ({ focused }) => (
-              <TabIcon
-                focused={focused}
-                outlineName="search-outline"
-                filledName="search"
-              />
+              <TabIcon focused={focused} outlineName="search-outline" filledName="search" />
             ),
           }}
         />
@@ -75,11 +67,7 @@ export default function TabsLayout(): React.ReactElement {
           options={{
             title: 'Bookings',
             tabBarIcon: ({ focused }) => (
-              <TabIcon
-                focused={focused}
-                outlineName="calendar-outline"
-                filledName="calendar"
-              />
+              <TabIcon focused={focused} outlineName="calendar-outline" filledName="calendar" />
             ),
           }}
         />
@@ -87,12 +75,9 @@ export default function TabsLayout(): React.ReactElement {
           name="wishlist"
           options={{
             title: 'Wishlist',
+            href: '/(tabs)/wishlist',
             tabBarIcon: ({ focused }) => (
-              <TabIcon
-                focused={focused}
-                outlineName="heart-outline"
-                filledName="heart"
-              />
+              <TabIcon focused={focused} outlineName="heart-outline" filledName="heart" />
             ),
           }}
         />
@@ -101,11 +86,7 @@ export default function TabsLayout(): React.ReactElement {
           options={{
             title: 'Profile',
             tabBarIcon: ({ focused }) => (
-              <TabIcon
-                focused={focused}
-                outlineName="person-outline"
-                filledName="person"
-              />
+              <TabIcon focused={focused} outlineName="person-outline" filledName="person" />
             ),
           }}
         />
@@ -122,26 +103,30 @@ const styles = StyleSheet.create({
   },
   tabBar: {
     backgroundColor: Colors.tabBackground,
-    borderTopColor: Colors.surfaceBorder,
+    borderTopColor: Colors.divider,
     borderTopWidth: 1,
-    height: 68,
-    paddingBottom: 10,
+    height: 80,
+    paddingBottom: 20,
     paddingTop: 8,
-    // 3D elevation
-    shadowColor: '#0F1535',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 16,
-    elevation: 16,
   },
-  iconWrap: {
-    width: 44,
-    height: 36,
-    borderRadius: 12,
+  label: {
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  iconStack: {
     alignItems: 'center',
-    justifyContent: 'center',
+    height: 32,
+    justifyContent: 'flex-end',
+    width: 32,
   },
-  iconWrapActive: {
-    backgroundColor: Colors.primaryGlow,
+  activeDot: {
+    backgroundColor: Colors.transparent,
+    borderRadius: 2,
+    height: 4,
+    marginBottom: 3,
+    width: 4,
+  },
+  activeDotVisible: {
+    backgroundColor: Colors.primary,
   },
 });

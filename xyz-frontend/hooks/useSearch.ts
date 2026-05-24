@@ -14,7 +14,7 @@ import type {
 } from '@tanstack/react-query';
 
 import { apiClient } from '../lib/api/client';
-import type { BackendApiResponse, PackageListItem, PaginatedResponse } from '../types';
+import type { PackageListItem, PaginatedResponse } from '../types';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 

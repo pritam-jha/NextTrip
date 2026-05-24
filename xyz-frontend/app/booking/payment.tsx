@@ -102,8 +102,14 @@ const methodStyles = StyleSheet.create({
 // ── Main screen ───────────────────────────────────────────────────────────────
 
 export default function PaymentScreen(): React.ReactElement {
-  const { bookingId } = useLocalSearchParams<{ bookingId: string }>();
-  const id = Array.isArray(bookingId) ? bookingId[0] : (bookingId ?? '');
+  const params = useLocalSearchParams();
+  const rawBookingId = params.bookingId;
+  const id =
+    typeof rawBookingId === 'string'
+      ? rawBookingId
+      : Array.isArray(rawBookingId)
+      ? rawBookingId[0] ?? ''
+      : '';
   const form = useBookingStore((s) => s.form);
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>('upi');
   const [upiId, setUpiId] = useState('');
@@ -162,7 +168,7 @@ export default function PaymentScreen(): React.ReactElement {
           <Text style={styles.amountValue}>{formatINR(amountToPay)}</Text>
           <View style={styles.securedRow}>
             <Ionicons name="shield-checkmark" size={14} color={Colors.success} />
-            <Text style={styles.securedText}>Secured by XYZ</Text>
+            <Text style={styles.securedText}>Secured by NEXTTRP</Text>
           </View>
           {form.paymentType === 'advance' && form.priceCalculation && (
             <Text style={styles.balanceNote}>Balance {formatINR(form.priceCalculation.balance_amount)} due before travel</Text>

@@ -7,9 +7,23 @@ import {
   getPackagesForCompare,
   searchPackages,
 } from '../services/packageService';
-import { defaultLimiter } from '../middleware/rateLimiter';
+import {
+  deletePackageImage,
+  getPackageImages,
+  savePackageImage,
+  setPackageCoverImage,
+} from '../services/packageImageService';
+import { requireAuth } from '../middleware/auth';
+import { defaultLimiter, strictLimiter } from '../middleware/rateLimiter';
 import { success } from '../utils/response';
-import { CompareIdsSchema, SearchFiltersSchema, UuidParamSchema } from '../utils/validation';
+import {
+  CompareIdsSchema,
+  ImageParamsSchema,
+  PackageImageSaveSchema,
+  SearchFiltersSchema,
+  UuidParamSchema,
+} from '../utils/validation';
+import { AppError, ERROR_MESSAGES } from '../constants/errors';
 import type { SearchFilters } from '../types';
 
 /**
@@ -54,6 +68,53 @@ packagesRouter.get('/:id', async (req, res, next) => {
     const { id } = UuidParamSchema.parse(req.params);
     const packageDetail = await getPackageById(id);
     return success(res, packageDetail);
+  } catch (caughtError) {
+    return next(caughtError);
+  }
+});
+
+// ── Vendor image management (authenticated, owner only) ───────────────────────
+
+packagesRouter.get('/:id/images', requireAuth, async (req, res, next) => {
+  try {
+    if (req.user === undefined) throw new AppError(ERROR_MESSAGES.AUTH_REQUIRED, 401);
+    const { id } = UuidParamSchema.parse(req.params);
+    const images = await getPackageImages(id, req.user.id);
+    return success(res, images);
+  } catch (caughtError) {
+    return next(caughtError);
+  }
+});
+
+packagesRouter.post('/:id/images', requireAuth, strictLimiter, async (req, res, next) => {
+  try {
+    if (req.user === undefined) throw new AppError(ERROR_MESSAGES.AUTH_REQUIRED, 401);
+    const { id } = UuidParamSchema.parse(req.params);
+    const input = PackageImageSaveSchema.parse(req.body);
+    const image = await savePackageImage(id, req.user.id, input);
+    return success(res, image, 201);
+  } catch (caughtError) {
+    return next(caughtError);
+  }
+});
+
+packagesRouter.patch('/:id/images/:imageId/cover', requireAuth, async (req, res, next) => {
+  try {
+    if (req.user === undefined) throw new AppError(ERROR_MESSAGES.AUTH_REQUIRED, 401);
+    const { id, imageId } = ImageParamsSchema.parse(req.params);
+    await setPackageCoverImage(id, imageId, req.user.id);
+    return success(res, null);
+  } catch (caughtError) {
+    return next(caughtError);
+  }
+});
+
+packagesRouter.delete('/:id/images/:imageId', requireAuth, async (req, res, next) => {
+  try {
+    if (req.user === undefined) throw new AppError(ERROR_MESSAGES.AUTH_REQUIRED, 401);
+    const { id, imageId } = ImageParamsSchema.parse(req.params);
+    await deletePackageImage(id, imageId, req.user.id);
+    return success(res, null);
   } catch (caughtError) {
     return next(caughtError);
   }

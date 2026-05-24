@@ -57,13 +57,13 @@ interface SubRatingsProps {
   review: Review;
 }
 
-const SUB_RATING_LABELS: Array<{
+const SUB_RATING_LABELS: {
   key: keyof Pick<
     Review,
     'rating_guide' | 'rating_hotel' | 'rating_food' | 'rating_transport' | 'rating_value'
   >;
   label: string;
-}> = [
+}[] = [
   { key: 'rating_guide', label: 'Guide' },
   { key: 'rating_hotel', label: 'Hotel' },
   { key: 'rating_food', label: 'Food' },

@@ -172,6 +172,8 @@
  * -- USERS
  * create policy "Users can view their own profile"
  *   on public.users for select using (auth.uid() = id);
+ * create policy "Users can insert their own profile"
+ *   on public.users for insert with check (auth.uid() = id);
  * create policy "Users can update their own profile"
  *   on public.users for update using (auth.uid() = id);
  *
@@ -238,7 +240,7 @@
 
 import 'react-native-url-polyfill/auto';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js';
 import { Config } from '../constants/config';
 
 /**
@@ -250,7 +252,7 @@ import { Config } from '../constants/config';
  * The `auth.storage` override is what makes sessions survive app restarts
  * on both iOS and Android — without it, users would be logged out every time.
  */
-export const supabase: SupabaseClient = createClient(
+export const supabase = createClient(
   Config.supabaseUrl,
   Config.supabaseAnonKey,
   {

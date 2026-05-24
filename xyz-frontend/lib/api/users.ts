@@ -7,6 +7,9 @@
 import { supabase } from '../supabase';
 import type { ApiResponse, User } from '../../types';
 
+// FIXED: 7 - Role changes must go through PATCH /api/v1/admin/users/:id/role, never frontend profile writes.
+const PROFILE_SELECT = 'id, full_name, avatar_url, phone, city, state, role, created_at';
+
 type ActiveSession = NonNullable<
   Awaited<ReturnType<typeof supabase.auth.getSession>>['data']['session']
 >;
@@ -44,6 +47,7 @@ function buildProfilePayload(session: ActiveSession): {
   phone: null;
   city: null;
   state: null;
+  role: 'traveler';
 } {
   const fullName =
     typeof session.user.user_metadata?.full_name === 'string'
@@ -62,6 +66,8 @@ function buildProfilePayload(session: ActiveSession): {
     phone: null,
     city: null,
     state: null,
+    // FIXED: 7 - Missing client-created profiles are always restored as travelers.
+    role: 'traveler',
   };
 }
 
@@ -73,7 +79,8 @@ async function fetchOrCreateProfile(
 ): Promise<ApiResponse<User>> {
   const profileResponse = await supabase
     .from('users')
-    .select('*')
+    // FIXED: 7 - Profile reads explicitly include role for auth routing.
+    .select(PROFILE_SELECT)
     .eq('id', session.user.id)
     .maybeSingle();
 
@@ -92,8 +99,9 @@ async function fetchOrCreateProfile(
 
   const createProfileResponse = await supabase
     .from('users')
+    // FIXED: 7 - Fallback profile upsert preserves the safe default traveler role.
     .upsert(buildProfilePayload(session), { onConflict: 'id' })
-    .select('*')
+    .select(PROFILE_SELECT)
     .single();
 
   if (createProfileResponse.error) {
@@ -176,7 +184,8 @@ export async function updateProfile(
       .from('users')
       .update(payload)
       .eq('id', session.user.id)
-      .select()
+      // FIXED: 7 - Updated profile responses include role for store hydration.
+      .select(PROFILE_SELECT)
       .single();
 
     if (updateProfileResponse.error) {
@@ -253,9 +262,40 @@ export async function signIn(
       return { data: null, error: 'Sign in failed: no user returned.' };
     }
 
-    // Fetch the public profile row
+    // Try to fetch the public profile row.
+    // If it fails (e.g. the users table hasn't been created yet, missing RLS
+    // INSERT policy, or the trigger didn't fire), we fall back to a minimal
+    // User object derived directly from the Supabase auth metadata.
+    // This ensures login always succeeds as long as the credentials are correct —
+    // the profile can be fetched / created later by the onAuthStateChange handler.
     const profileResponse = await getProfile();
-    return profileResponse;
+
+    if (profileResponse.data) {
+      return profileResponse;
+    }
+
+    // Profile fetch failed — build a minimal user from auth metadata so login
+    // is not blocked by a missing or inaccessible profile row.
+    const { user: authUser } = authData;
+    const fallbackUser: User = {
+      id: authUser.id,
+      full_name:
+        typeof authUser.user_metadata?.full_name === 'string'
+          ? authUser.user_metadata.full_name
+          : null,
+      avatar_url:
+        typeof authUser.user_metadata?.avatar_url === 'string'
+          ? authUser.user_metadata.avatar_url
+          : null,
+      phone: null,
+      city: null,
+      state: null,
+      // FIXED: 1 - A missing profile cannot grant elevated access.
+      role: 'traveler',
+      created_at: authUser.created_at,
+    };
+
+    return { data: fallbackUser, error: null };
   } catch (err) {
     return {
       data: null,
@@ -321,8 +361,7 @@ export async function signUp(
       return { data: null, error: 'Sign up failed: no user returned.' };
     }
 
-    // The trigger creates the profile row asynchronously.
-    // We construct a minimal User object from auth data to avoid a race condition.
+    // FIXED: 7 - The DB trigger creates the profile row; this fallback upsert self-heals if a session exists.
     const newUser: User = {
       id: authData.user.id,
       full_name: fullName,
@@ -330,8 +369,31 @@ export async function signUp(
       phone: phone ?? null,
       city: city ?? null,
       state: state ?? null,
+      role: 'traveler',
       created_at: authData.user.created_at,
     };
+
+    // FIXED: 7 - The public client can only upsert the signed-in user's own traveler profile via RLS.
+    const upsertProfileResponse = await supabase
+      .from('users')
+      .upsert(
+        {
+          id: authData.user.id,
+          full_name: fullName,
+          avatar_url: null,
+          phone: phone ?? null,
+          city: city ?? null,
+          state: state ?? null,
+          role: 'traveler',
+        },
+        { onConflict: 'id' }
+      )
+      .select(PROFILE_SELECT)
+      .maybeSingle();
+
+    if (upsertProfileResponse.data) {
+      return { data: upsertProfileResponse.data as User, error: null };
+    }
 
     return { data: newUser, error: null };
   } catch (err) {
@@ -457,7 +519,7 @@ export async function resetPassword(
     }
 
     const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-      redirectTo: 'xyzapp://reset-password',
+      redirectTo: 'nexttrp://reset-password',
     });
 
     if (error) {

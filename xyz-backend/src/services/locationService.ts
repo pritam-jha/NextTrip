@@ -1,5 +1,6 @@
 import { AppError, ERROR_MESSAGES } from '../constants/errors';
-import { supabase } from '../lib/supabase';
+// FIXED: 4 - Public location reads use the clearly named anon client.
+import { supabasePublic } from '../lib/supabase';
 import type { Location } from '../types';
 
 const isRecord = (value: unknown): value is Record<string, unknown> => {
@@ -57,7 +58,7 @@ const mapLocation = (value: unknown): Location => {
  * Fetches active locations, optionally restricted to popular destinations.
  */
 export const getLocations = async (popular?: boolean): Promise<Location[]> => {
-  let query = supabase
+  let query = supabasePublic
     .from('locations')
     .select('id, city, state, region, country, latitude, longitude, is_popular, is_active, created_at')
     .eq('is_active', true);

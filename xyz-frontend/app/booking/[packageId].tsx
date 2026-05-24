@@ -13,6 +13,7 @@ import React, {
 } from 'react';
 import {
   Alert,
+  Animated,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -37,6 +38,7 @@ import { useBookingStore } from '../../store/bookingStore';
 import { useAuth } from '../../hooks/useAuth';
 import { Colors } from '../../constants/colors';
 import { formatINR } from '../../utils/currency';
+import { useSlideUp } from '../../utils/animations';
 import type { PrimaryContact, TravelerDetail } from '../../types';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -49,7 +51,7 @@ const MAX_DATE = new Date();
 MAX_DATE.setFullYear(MAX_DATE.getFullYear() + 1);
 
 function toISODate(date: Date): string {
-  return date.toISOString().split('T')[0]!;
+  return date.toISOString().split('T')[0] ?? '';
 }
 
 function formatDisplayDate(isoDate: string): string {
@@ -181,9 +183,16 @@ const dpStyles = StyleSheet.create({
 // ── Main screen ───────────────────────────────────────────────────────────────
 
 export default function TravelerDetailsScreen(): React.ReactElement {
-  const { packageId } = useLocalSearchParams<{ packageId: string }>();
-  const id = Array.isArray(packageId) ? packageId[0] : (packageId ?? '');
+  const params = useLocalSearchParams();
+  const rawPackageId = params.packageId;
+  const id =
+    typeof rawPackageId === 'string'
+      ? rawPackageId
+      : Array.isArray(rawPackageId)
+      ? rawPackageId[0] ?? ''
+      : '';
   const { user } = useAuth();
+  const slideUp = useSlideUp();
   const setBookingForm = useBookingStore((s) => s.setForm);
   const { data: pkg, isLoading, isError } = usePackageDetail(id);
 
@@ -210,7 +219,8 @@ export default function TravelerDetailsScreen(): React.ReactElement {
   const priceCalc = usePriceCalculation(selectedTier, numTravelers, paymentType);
 
   useEffect(() => {
-    if (pkg && !selectedTierId && pkg.pricing.length > 0) setSelectedTierId(pkg.pricing[0]!.id);
+    const firstTier = pkg?.pricing[0];
+    if (firstTier && !selectedTierId) setSelectedTierId(firstTier.id);
   }, [pkg, selectedTierId]);
 
   useEffect(() => {
@@ -229,7 +239,9 @@ export default function TravelerDetailsScreen(): React.ReactElement {
     setTravelers((prev) => {
       if (prev.length === 0) return prev;
       const updated = [...prev];
-      updated[0] = { ...updated[0]!, name: contact.full_name, is_primary: true };
+      const firstTraveler = updated[0];
+      if (!firstTraveler) return updated;
+      updated[0] = { ...firstTraveler, name: contact.full_name, is_primary: true };
       return updated;
     });
   }, [autoFillPrimary, contact.full_name]);
@@ -285,6 +297,7 @@ export default function TravelerDetailsScreen(): React.ReactElement {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
+      <Animated.View style={[styles.flex, slideUp.animatedStyle]}>
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         {/* Header */}
         <View style={styles.header}>
@@ -385,6 +398,7 @@ export default function TravelerDetailsScreen(): React.ReactElement {
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
+      </Animated.View>
     </SafeAreaView>
   );
 }
@@ -392,7 +406,7 @@ export default function TravelerDetailsScreen(): React.ReactElement {
 // ── Styles ────────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  safeArea: { backgroundColor: Colors.backgroundBase, flex: 1 },
+  safeArea: { backgroundColor: Colors.background, flex: 1 },
   flex: { flex: 1 },
   centered: { alignItems: 'center', flex: 1, justifyContent: 'center', padding: 32 },
   loadingText: { color: Colors.textSecondary, fontSize: 15, fontWeight: '500', lineHeight: 22 },
@@ -426,7 +440,7 @@ const styles = StyleSheet.create({
   stickyBar: { alignItems: 'center', backgroundColor: Colors.surfacePrimary, borderTopColor: Colors.surfaceBorder, borderTopWidth: 1, flexDirection: 'row', gap: 12, paddingBottom: Platform.OS === 'ios' ? 24 : 16, paddingHorizontal: 16, paddingTop: 12 },
   stickyTotal: { flex: 1 },
   stickyTotalLabel: { color: Colors.textSecondary, fontSize: 12, fontWeight: '600', lineHeight: 16 },
-  stickyTotalValue: { color: Colors.textPrimary, fontSize: 20, fontWeight: '700', lineHeight: 26 },
+  stickyTotalValue: { color: Colors.primary, fontSize: 20, fontWeight: '700', lineHeight: 26 },
   continueButton: { alignItems: 'center', backgroundColor: Colors.primary, borderRadius: 999, flexDirection: 'row', gap: 6, paddingHorizontal: 20, paddingVertical: 14 },
   continueButtonDisabled: { backgroundColor: Colors.textTertiary },
   continueButtonText: { color: Colors.white, fontSize: 15, fontWeight: '700', lineHeight: 20 },

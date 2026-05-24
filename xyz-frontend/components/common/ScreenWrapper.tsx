@@ -38,7 +38,7 @@ export const ScreenWrapper: React.FC<ScreenWrapperProps> = ({
   contentStyle,
   withPadding = true,
   edges = ['top', 'left', 'right'],
-  showGlow = false,
+  showGlow: _showGlow = false,
 }) => {
   const paddingStyle: ViewStyle = withPadding
     ? { paddingHorizontal: 20 }

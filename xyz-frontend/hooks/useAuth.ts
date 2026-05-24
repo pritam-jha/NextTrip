@@ -4,12 +4,14 @@
  */
 
 import { useCallback, useMemo, useState } from 'react';
+import { router } from 'expo-router';
 import * as AuthSession from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { UseMutationResult } from '@tanstack/react-query';
 
-import { useAuthStore } from '../store/authStore';
+// FIXED: 1 - Auth mutations use the central role-to-route mapping after login.
+import { getHomeRouteForRole, useAuthStore } from '../store/authStore';
 import { useWishlistStore } from '../store/wishlistStore';
 import { getWishlistIds } from '../lib/api/wishlist';
 import { supabase } from '../lib/supabase';
@@ -208,7 +210,7 @@ function hydrateWishlist(setWishlist: (packageIds: string[]) => void): void {
 
 function createRedirectUri(): string {
   return AuthSession.makeRedirectUri({
-    scheme: 'xyzapp',
+    scheme: 'nexttrp',
     path: 'auth/callback',
   });
 }
@@ -239,14 +241,17 @@ async function runGoogleOAuth(): Promise<User> {
   if (!authUrl) throw new Error('Google sign in failed to start.');
 
   // 2. Open the Supabase-generated URL in the system browser.
-  //    The browser will redirect back to xyzapp://auth/callback?code=...
+  //    The browser will redirect back to nexttrp://auth/callback?code=...
   const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUri, {
     preferEphemeralSession: true,
   });
 
   // User closed the browser without completing sign-in — not an error,
   // just a silent no-op so we don't show a scary error message.
-  if (result.type === 'cancel' || result.type === 'dismiss') {
+  if (
+    result.type === WebBrowser.WebBrowserResultType.CANCEL ||
+    result.type === WebBrowser.WebBrowserResultType.DISMISS
+  ) {
     throw new Error('__CANCELLED__');
   }
 
@@ -342,6 +347,8 @@ export function useSignIn(): UseSignInReturn {
         } else {
           setUser(user);
         }
+        // FIXED: 1 - Successful email login redirects by public.users.role.
+        router.replace(getHomeRouteForRole(user.role));
       });
       hydrateWishlist(setWishlist);
     },
@@ -356,6 +363,8 @@ export function useSignIn(): UseSignInReturn {
         } else {
           setUser(user);
         }
+        // FIXED: 1 - Successful OAuth login redirects by public.users.role.
+        router.replace(getHomeRouteForRole(user.role));
       });
       hydrateWishlist(setWishlist);
     },
@@ -420,6 +429,8 @@ export function useSignIn(): UseSignInReturn {
 
 export function useSignUp(): UseSignUpReturn {
   const setUser = useAuthStore((state) => state.setUser);
+  // FIXED: 7 - Signup stores the role-bearing profile with the session when available.
+  const setSession = useAuthStore((state) => state.setSession);
   const [fullName, setFullNameValue] = useState('');
   const [phone, setPhoneValue] = useState('');
   const [city, setCityValue] = useState('');
@@ -453,7 +464,15 @@ export function useSignUp(): UseSignUpReturn {
       return data;
     },
     onSuccess: (user) => {
-      setUser(user);
+      // FIXED: 7 - Store role and session together after signup when Supabase returns a session.
+      void supabase.auth.getSession().then(({ data: { session } }) => {
+        if (session) {
+          setSession(user, session);
+        } else {
+          setUser(user);
+        }
+        router.replace(getHomeRouteForRole(user.role));
+      });
     },
   });
 

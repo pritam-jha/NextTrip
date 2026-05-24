@@ -1,42 +1,42 @@
 /**
  * @file components/search/PackageListCard.tsx
- * @description Vertical package card for the search results list.
- *
- * Differs from home/PackageCard (horizontal carousel card) in layout:
- * - Full-width vertical layout
- * - Inclusions preview chips
- * - Savings badge
- * - Larger action row with "View Details" CTA
+ * @description NEXTTRP full-width package result card.
  */
 
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  Animated,
   Image,
   Pressable,
   StyleSheet,
   Text,
   View,
+  type GestureResponderEvent,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 
+import { Badge } from '../ui/Badge';
+import { StarRating } from '../ui/StarRating';
 import { useCompare } from '../../hooks/useCompare';
 import { useToggleWishlist } from '../../hooks/useWishlist';
 import { useWishlistStore } from '../../store/wishlistStore';
 import { Colors } from '../../constants/colors';
+import { Shadows } from '../../constants/shadows';
+import { use3DCard, useHeartBounce } from '../../utils/animations';
+import { getPackageKeywordImage, PACKAGE_DEFAULT_IMAGE } from '../../utils/packageImages';
 import type { PackageListItem } from '../../types';
 
-// ── Constants ─────────────────────────────────────────────────────────────────
-
-const MAX_INCLUSION_CHIPS = 3;
+export interface PackageListCardProps {
+  item: PackageListItem;
+  onCompareFull?: () => void;
+}
 
 const currencyFormatter = new Intl.NumberFormat('en-IN', {
   currency: 'INR',
   maximumFractionDigits: 0,
   style: 'currency',
 });
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function formatPrice(amount: number): string {
   return currencyFormatter.format(amount);
@@ -51,69 +51,45 @@ function getCloudinaryUrl(
   const marker = '/image/upload/';
   if (!url.includes(marker)) return url;
   if (url.includes('f_auto') || url.includes('q_auto')) return url;
-  return url.replace(
-    marker,
-    `${marker}c_fill,w_${width},h_${height},f_auto,q_auto/`
-  );
+  return url.replace(marker, `${marker}c_fill,w_${width},h_${height},f_auto,q_auto/`);
 }
-
-type BadgeType = 'FEATURED' | 'BESTSELLER' | 'best_value' | 'highest_rated' | 'most_inclusive';
-
-interface BadgeConfig {
-  label: string;
-  bgColor: string;
-  textColor: string;
-}
-
-const BADGE_CONFIG: Record<BadgeType, BadgeConfig> = {
-  FEATURED: {
-    label: 'FEATURED',
-    bgColor: Colors.primary,
-    textColor: Colors.white,
-  },
-  BESTSELLER: {
-    label: 'BESTSELLER',
-    bgColor: Colors.primary,
-    textColor: Colors.white,
-  },
-  best_value: {
-    label: 'Best Value',
-    bgColor: Colors.success,
-    textColor: Colors.white,
-  },
-  highest_rated: {
-    label: 'Highest Rated',
-    bgColor: Colors.star,
-    textColor: Colors.white,
-  },
-  most_inclusive: {
-    label: 'Most Inclusive',
-    bgColor: Colors.info,
-    textColor: Colors.white,
-  },
-};
-
-// ── Props ─────────────────────────────────────────────────────────────────────
-
-export interface PackageListCardProps {
-  item: PackageListItem;
-  onCompareFull?: () => void;
-}
-
-// ── Component ─────────────────────────────────────────────────────────────────
 
 export function PackageListCard({
   item,
   onCompareFull,
 }: PackageListCardProps): React.ReactElement {
+  const card3D = use3DCard();
+  const heart = useHeartBounce();
   const isWishlisted = useWishlistStore((state) => state.isWishlisted(item.id));
-  const { mutate: toggleWishlist, isPending: isWishlistPending } =
-    useToggleWishlist();
+  const { mutate: toggleWishlist, isPending: isWishlistPending } = useToggleWishlist();
   const { addToCompare, removeFromCompare, isInCompare } = useCompare();
 
   const inCompare = isInCompare(item.id);
 
-  // Pricing
+  /**
+   * Three-tier image priority — same strategy as PackageCard:
+   *   [0] Keyword destination image  — guaranteed correct location photo
+   *   [1] Cloudinary cover_image     — only if no keyword match
+   *   [2] PACKAGE_DEFAULT_IMAGE      — absolute last resort, never blank
+   */
+  const imageSources = useMemo((): string[] => {
+    const sources: string[] = [];
+    const keywordImage = getPackageKeywordImage(item);
+    const cloudinaryImage = getCloudinaryUrl(item.cover_image, 900, 506);
+    if (keywordImage) sources.push(keywordImage);
+    if (cloudinaryImage && cloudinaryImage !== keywordImage) sources.push(cloudinaryImage);
+    sources.push(PACKAGE_DEFAULT_IMAGE);
+    return sources;
+  }, [item]);
+
+  const [imageIndex, setImageIndex] = useState(0);
+
+  const handleImageError = useCallback(() => {
+    setImageIndex((prev) => prev + 1);
+  }, []);
+
+  const coverImage = imageSources[Math.min(imageIndex, imageSources.length - 1)];
+
   const firstPricing = item.pricing[0] ?? null;
   const basePrice = firstPricing?.base_price ?? null;
   const discountedPrice =
@@ -123,52 +99,21 @@ export function PackageListCard({
     firstPricing.discounted_price < basePrice
       ? firstPricing.discounted_price
       : null;
-  const savings =
-    basePrice !== null && discountedPrice !== null
-      ? basePrice - discountedPrice
-      : null;
+  const finalPrice = discountedPrice ?? basePrice;
 
-  // Cover image
-  const coverImage = useMemo(
-    () => getCloudinaryUrl(item.cover_image, 900, 506),
-    [item.cover_image]
-  );
-
-  // Badges — combine is_featured / is_bestseller with backend-computed badges
-  const badges = useMemo<BadgeType[]>(() => {
-    const result: BadgeType[] = [];
-    if (item.is_featured) result.push('FEATURED');
-    if (item.is_bestseller) result.push('BESTSELLER');
-    item.badges.forEach((b) => {
-      if (
-        b.type === 'best_value' ||
-        b.type === 'highest_rated' ||
-        b.type === 'most_inclusive'
-      ) {
-        result.push(b.type);
-      }
-    });
-    return result;
-  }, [item.is_featured, item.is_bestseller, item.badges]);
-
-  // Inclusions preview
-  const visibleInclusions = item.inclusions.slice(0, MAX_INCLUSION_CHIPS);
-  const extraInclusionsCount = Math.max(
-    0,
-    item.inclusions.length - MAX_INCLUSION_CHIPS
-  );
-
-  // Handlers
-  const handleCardPress = useCallback(() => {
-    router.push({
-      pathname: '/package/[id]' as never,
-      params: { id: item.id },
-    });
+  useEffect(() => {
+    setImageIndex(0);
   }, [item.id]);
 
-  const handleWishlistPress = useCallback(() => {
+  const handleCardPress = useCallback(() => {
+    router.push({ pathname: '/package/[id]' as never, params: { id: item.id } });
+  }, [item.id]);
+
+  const handleWishlistPress = useCallback((event: GestureResponderEvent) => {
+    event.stopPropagation();
+    heart.trigger();
     toggleWishlist({ packageId: item.id });
-  }, [item.id, toggleWishlist]);
+  }, [heart, item.id, toggleWishlist]);
 
   const handleComparePress = useCallback(() => {
     if (inCompare) {
@@ -176,291 +121,158 @@ export function PackageListCard({
       return;
     }
     const result = addToCompare(item);
-    if (result === 'tray_full') {
-      onCompareFull?.();
-    }
+    if (result === 'tray_full') onCompareFull?.();
   }, [addToCompare, inCompare, item, onCompareFull, removeFromCompare]);
 
-  // Star rating display
-  const fullStars = Math.floor(item.avg_rating);
-  const hasHalfStar = item.avg_rating - fullStars >= 0.5;
-
   return (
-    <Pressable
-      style={styles.card}
-      onPress={handleCardPress}
-      accessibilityRole="button"
-      accessibilityLabel={`View package ${item.title}`}
-    >
-      {/* ── Cover image ── */}
-      <View style={styles.imageWrap}>
-        {coverImage ? (
+    <Animated.View style={card3D.animatedStyle}>
+      <Pressable
+        style={[styles.card, Shadows.card]}
+        onPress={handleCardPress}
+        onPressIn={card3D.onPressIn}
+        onPressOut={card3D.onPressOut}
+        accessibilityRole="button"
+        accessibilityLabel={`View package ${item.title}`}
+      >
+        <View style={styles.imageWrap}>
           <Image
             source={{ uri: coverImage }}
             style={styles.coverImage}
             resizeMode="cover"
             accessibilityLabel={`Cover image for ${item.title}`}
+            onError={handleImageError}
           />
-        ) : (
-          <View style={styles.imageFallback}>
-            <Ionicons name="image-outline" size={40} color={Colors.textTertiary} />
-          </View>
-        )}
 
-        {/* Badges row */}
-        {badges.length > 0 && (
           <View style={styles.badgesRow}>
-            {badges.slice(0, 3).map((badge) => {
-              const config = BADGE_CONFIG[badge];
-              return (
-                <View
-                  key={badge}
-                  style={[styles.badge, { backgroundColor: config.bgColor }]}
-                >
-                  <Text
-                    style={[styles.badgeText, { color: config.textColor }]}
-                    numberOfLines={1}
-                  >
-                    {config.label}
-                  </Text>
-                </View>
-              );
-            })}
+            {item.is_featured ? <Badge type="FEATURED" /> : null}
+            {item.is_bestseller ? <Badge type="BESTSELLER" /> : null}
           </View>
-        )}
 
-        {/* Wishlist button */}
-        <Pressable
-          style={styles.wishlistButton}
-          onPress={handleWishlistPress}
-          disabled={isWishlistPending}
-          accessibilityRole="button"
-          accessibilityLabel={
-            isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'
-          }
-          accessibilityState={{
-            checked: isWishlisted,
-            disabled: isWishlistPending,
-          }}
-          hitSlop={8}
-        >
-          <Ionicons
-            name={isWishlisted ? 'heart' : 'heart-outline'}
-            size={20}
-            color={isWishlisted ? Colors.error : Colors.textPrimary}
-          />
-        </Pressable>
-      </View>
-
-      {/* ── Body ── */}
-      <View style={styles.body}>
-        {/* Company row */}
-        <View style={styles.companyRow}>
-          <Text style={styles.companyName} numberOfLines={1}>
-            {item.company.name}
-          </Text>
-          {item.company.is_verified && (
-            <View style={styles.verifiedBadge}>
+          <Animated.View style={[styles.wishlistWrap, heart.animatedStyle]}>
+            <Pressable
+              style={[styles.wishlistButton, Shadows.soft]}
+              onPress={handleWishlistPress}
+              disabled={isWishlistPending}
+              accessibilityRole="button"
+              accessibilityLabel={isWishlisted ? 'Remove from wishlist' : 'Add to wishlist'}
+              accessibilityState={{ checked: isWishlisted, disabled: isWishlistPending }}
+              hitSlop={HIT_SLOP}
+            >
               <Ionicons
-                name="checkmark-circle"
-                size={13}
-                color={Colors.primary}
+                name={isWishlisted ? 'heart' : 'heart-outline'}
+                size={20}
+                color={isWishlisted ? Colors.error : Colors.navy}
               />
-              <Text style={styles.verifiedText} numberOfLines={1}>
-                Verified
-              </Text>
+            </Pressable>
+          </Animated.View>
+        </View>
+
+        <View style={styles.body}>
+          <View style={styles.companyRow}>
+            <Text style={styles.companyName} numberOfLines={1}>
+              {item.company.name}
+            </Text>
+            {item.company.is_verified ? (
+              <Badge type="VERIFIED" />
+            ) : null}
+          </View>
+
+          <Text style={styles.title} numberOfLines={2}>
+            {item.title}
+          </Text>
+
+          <View style={styles.metaRow}>
+            <Ionicons name="location" size={14} color={Colors.primary} />
+            <Text style={styles.metaText} numberOfLines={1}>
+              {item.location.city}, {item.location.state}
+            </Text>
+          </View>
+
+          <View style={styles.detailRow}>
+            <View style={styles.detailItem}>
+              <Ionicons name="time-outline" size={14} color={Colors.textSecondary} />
+              <Text style={styles.detailText}>{item.duration_days}D/{item.duration_nights}N</Text>
             </View>
-          )}
-        </View>
+            <View style={styles.detailItem}>
+              <Ionicons name="people-outline" size={14} color={Colors.textSecondary} />
+              <Text style={styles.detailText}>{item.min_group_size}-{item.max_group_size} pax</Text>
+            </View>
+          </View>
 
-        {/* Title */}
-        <Text style={styles.title} numberOfLines={2}>
-          {item.title}
-        </Text>
-
-        {/* Location */}
-        <View style={styles.metaRow}>
-          <Ionicons
-            name="location-outline"
-            size={14}
-            color={Colors.textSecondary}
-          />
-          <Text style={styles.metaText} numberOfLines={1}>
-            {item.location.city}, {item.location.state}
-          </Text>
-        </View>
-
-        {/* Duration + group size */}
-        <View style={styles.detailRow}>
-          <View style={styles.detailItem}>
-            <Ionicons
-              name="time-outline"
-              size={14}
-              color={Colors.textSecondary}
-            />
-            <Text style={styles.detailText} numberOfLines={1}>
-              {item.duration_days}D / {item.duration_nights}N
+          <View style={styles.ratingRow}>
+            <StarRating rating={item.avg_rating} size={14} />
+            <Text style={styles.ratingValue}>{item.avg_rating.toFixed(1)}</Text>
+            <Text style={styles.reviewCount}>
+              ({item.review_count.toLocaleString('en-IN')} reviews)
             </Text>
           </View>
-          <View style={styles.detailItem}>
-            <Ionicons
-              name="people-outline"
-              size={14}
-              color={Colors.textSecondary}
-            />
-            <Text style={styles.detailText} numberOfLines={1}>
-              {item.min_group_size}–{item.max_group_size} pax
-            </Text>
-          </View>
-        </View>
 
-        {/* Rating */}
-        <View style={styles.ratingRow}>
-          {Array.from({ length: 5 }, (_, i) => {
-            const filled = i < fullStars;
-            const half = !filled && i === fullStars && hasHalfStar;
-            return (
-              <Ionicons
-                key={i}
-                name={filled ? 'star' : half ? 'star-half' : 'star-outline'}
-                size={14}
-                color={Colors.star}
-              />
-            );
-          })}
-          <Text style={styles.ratingValue} numberOfLines={1}>
-            {item.avg_rating.toFixed(1)}
-          </Text>
-          <Text style={styles.reviewCount} numberOfLines={1}>
-            ({item.review_count.toLocaleString('en-IN')} reviews)
-          </Text>
-        </View>
+          <View style={styles.footerRow}>
+            <View style={styles.priceBlock}>
+              {finalPrice === null ? (
+                <Text style={styles.priceOnRequest}>Price on request</Text>
+              ) : (
+                <>
+                  {discountedPrice !== null && basePrice !== null ? (
+                    <Text style={styles.basePrice}>{formatPrice(basePrice)}</Text>
+                  ) : null}
+                  <Text style={styles.finalPrice}>{formatPrice(finalPrice)}</Text>
+                  <Text style={styles.perPerson}>per person</Text>
+                </>
+              )}
+            </View>
 
-        {/* Inclusions preview */}
-        {visibleInclusions.length > 0 && (
-          <View style={styles.inclusionsRow}>
-            {visibleInclusions.map((inclusion, index) => (
-              <View key={index} style={styles.inclusionChip}>
-                <Ionicons
-                  name="checkmark"
-                  size={11}
-                  color={Colors.primary}
-                />
-                <Text style={styles.inclusionText} numberOfLines={1}>
-                  {inclusion}
-                </Text>
-              </View>
-            ))}
-            {extraInclusionsCount > 0 && (
-              <View style={styles.inclusionChipMore}>
-                <Text style={styles.inclusionMoreText} numberOfLines={1}>
-                  +{extraInclusionsCount} more
-                </Text>
-              </View>
-            )}
-          </View>
-        )}
-
-        {/* Price + actions */}
-        <View style={styles.footerRow}>
-          {/* Price block */}
-          <View style={styles.priceBlock}>
-            {basePrice === null ? (
-              <Text style={styles.priceOnRequest} numberOfLines={1}>
-                Price on request
-              </Text>
-            ) : (
-              <>
-                {discountedPrice !== null && (
-                  <Text style={styles.basePrice} numberOfLines={1}>
-                    {formatPrice(basePrice)}
-                  </Text>
-                )}
-                <Text style={styles.finalPrice} numberOfLines={1}>
-                  {formatPrice(discountedPrice ?? basePrice)}
-                </Text>
-                {savings !== null && savings > 0 && (
-                  <View style={styles.savingsBadge}>
-                    <Text style={styles.savingsText} numberOfLines={1}>
-                      Save {formatPrice(savings)}
-                    </Text>
-                  </View>
-                )}
-                <Text style={styles.perPerson} numberOfLines={1}>
-                  per person
-                </Text>
-              </>
-            )}
-          </View>
-
-          {/* Action buttons */}
-          <View style={styles.actionButtons}>
-            {/* Compare */}
-            <Pressable
-              style={[
-                styles.compareButton,
-                inCompare && styles.compareButtonActive,
-              ]}
-              onPress={handleComparePress}
-              accessibilityRole="button"
-              accessibilityLabel={
-                inCompare ? 'Remove from compare' : 'Add to compare'
-              }
-              accessibilityState={{ selected: inCompare }}
-            >
-              <Ionicons
-                name={inCompare ? 'checkmark' : 'git-compare-outline'}
-                size={14}
-                color={inCompare ? Colors.white : Colors.primary}
-              />
-              <Text
-                style={[
-                  styles.compareText,
-                  inCompare && styles.compareTextActive,
-                ]}
-                numberOfLines={1}
+            <View style={styles.actionButtons}>
+              <Pressable
+                style={[styles.compareButton, inCompare && styles.compareButtonActive]}
+                onPress={handleComparePress}
+                accessibilityRole="button"
+                accessibilityLabel={inCompare ? 'Remove from compare' : 'Add to compare'}
+                accessibilityState={{ selected: inCompare }}
               >
-                {inCompare ? 'Added' : 'Compare'}
-              </Text>
-            </Pressable>
+                <Ionicons
+                  name={inCompare ? 'checkmark' : 'git-compare-outline'}
+                  size={14}
+                  color={inCompare ? Colors.textWhite : Colors.primary}
+                />
+                <Text style={[styles.compareText, inCompare && styles.compareTextActive]}>
+                  {inCompare ? 'Added' : 'Compare'}
+                </Text>
+              </Pressable>
 
-            {/* View Details */}
-            <Pressable
-              style={styles.viewButton}
-              onPress={handleCardPress}
-              accessibilityRole="button"
-              accessibilityLabel={`View details for ${item.title}`}
-            >
-              <Text style={styles.viewButtonText} numberOfLines={1}>
-                View Details
-              </Text>
-            </Pressable>
+              <Pressable
+                style={styles.viewButton}
+                onPress={handleCardPress}
+                accessibilityRole="button"
+                accessibilityLabel={`View details for ${item.title}`}
+              >
+                <Text style={styles.viewButtonText}>View Details</Text>
+              </Pressable>
+            </View>
           </View>
         </View>
-      </View>
-    </Pressable>
+      </Pressable>
+    </Animated.View>
   );
 }
 
-// ── Styles ────────────────────────────────────────────────────────────────────
+const HIT_SLOP = {
+  bottom: 8,
+  left: 8,
+  right: 8,
+  top: 8,
+};
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: Colors.surfacePrimary,
-    borderColor: Colors.surfaceBorder,
-    borderRadius: 18,
-    borderWidth: 1,
-    elevation: 6,
+    backgroundColor: Colors.surface,
+    borderRadius: 20,
     marginBottom: 16,
     overflow: 'hidden',
-    shadowColor: '#0F1535',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.09,
-    shadowRadius: 18,
   },
   imageWrap: {
     aspectRatio: 16 / 9,
-    backgroundColor: Colors.backgroundLayer2,
+    backgroundColor: Colors.backgroundSoft,
     position: 'relative',
     width: '100%',
   },
@@ -470,44 +282,29 @@ const styles = StyleSheet.create({
   },
   imageFallback: {
     alignItems: 'center',
-    backgroundColor: Colors.backgroundLayer2,
+    backgroundColor: Colors.backgroundSoft,
     flex: 1,
     justifyContent: 'center',
   },
   badgesRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    gap: 6,
     left: 12,
     position: 'absolute',
     top: 12,
-    gap: 6,
   },
-  badge: {
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  badgeText: {
-    fontSize: 10,
-    fontWeight: '700',
-    lineHeight: 12,
-    letterSpacing: 0.3,
-  },
-  wishlistButton: {
-    alignItems: 'center',
-    backgroundColor: Colors.white,
-    borderRadius: 18,
-    height: 36,
-    justifyContent: 'center',
+  wishlistWrap: {
     position: 'absolute',
     right: 12,
     top: 12,
+  },
+  wishlistButton: {
+    alignItems: 'center',
+    backgroundColor: Colors.backgroundWhite,
+    borderRadius: 18,
+    height: 36,
+    justifyContent: 'center',
     width: 36,
-    shadowColor: '#0F1535',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12,
-    shadowRadius: 6,
-    elevation: 4,
   },
   body: {
     padding: 16,
@@ -515,56 +312,38 @@ const styles = StyleSheet.create({
   companyRow: {
     alignItems: 'center',
     flexDirection: 'row',
+    gap: 8,
     marginBottom: 6,
-    gap: 6,
   },
   companyName: {
-    color: Colors.textTertiary,
+    color: Colors.textLight,
     flex: 1,
     fontSize: 12,
     fontWeight: '600',
-    lineHeight: 16,
-  },
-  verifiedBadge: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    backgroundColor: Colors.successLight,
-    borderRadius: 999,
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    gap: 3,
-  },
-  verifiedText: {
-    color: Colors.success,
-    fontSize: 11,
-    fontWeight: '700',
-    lineHeight: 14,
   },
   title: {
-    color: Colors.textPrimary,
-    fontSize: 16,
+    color: Colors.navy,
+    fontSize: 17,
     fontWeight: '700',
-    lineHeight: 22,
+    lineHeight: 23,
     marginBottom: 8,
-    letterSpacing: -0.2,
   },
   metaRow: {
     alignItems: 'center',
     flexDirection: 'row',
+    gap: 5,
     marginBottom: 8,
-    gap: 4,
   },
   metaText: {
     color: Colors.textSecondary,
     flex: 1,
     fontSize: 13,
     fontWeight: '500',
-    lineHeight: 18,
   },
   detailRow: {
     flexDirection: 'row',
-    marginBottom: 8,
     gap: 16,
+    marginBottom: 8,
   },
   detailItem: {
     alignItems: 'center',
@@ -575,72 +354,28 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     fontSize: 12,
     fontWeight: '500',
-    lineHeight: 16,
   },
   ratingRow: {
     alignItems: 'center',
     flexDirection: 'row',
+    gap: 4,
     marginBottom: 12,
-    gap: 2,
   },
   ratingValue: {
-    color: Colors.textPrimary,
+    color: Colors.navy,
     fontSize: 13,
     fontWeight: '700',
-    lineHeight: 18,
-    marginLeft: 5,
   },
   reviewCount: {
-    color: Colors.textTertiary,
+    color: Colors.textLight,
     fontSize: 12,
-    fontWeight: '500',
-    lineHeight: 18,
-    marginLeft: 3,
-  },
-  inclusionsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginBottom: 14,
-    gap: 6,
-  },
-  inclusionChip: {
-    alignItems: 'center',
-    backgroundColor: Colors.successLight,
-    borderRadius: 8,
-    flexDirection: 'row',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    gap: 4,
-  },
-  inclusionText: {
-    color: Colors.success,
-    fontSize: 11,
-    fontWeight: '600',
-    lineHeight: 14,
-    maxWidth: 100,
-  },
-  inclusionChipMore: {
-    alignItems: 'center',
-    backgroundColor: Colors.backgroundLayer2,
-    borderColor: Colors.surfaceBorder,
-    borderRadius: 8,
-    borderWidth: 1,
-    justifyContent: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  inclusionMoreText: {
-    color: Colors.textTertiary,
-    fontSize: 11,
-    fontWeight: '600',
-    lineHeight: 14,
   },
   footerRow: {
     alignItems: 'flex-end',
+    borderTopColor: Colors.divider,
+    borderTopWidth: 1,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    borderTopWidth: 1,
-    borderTopColor: Colors.surfaceBorder,
     paddingTop: 14,
   },
   priceBlock: {
@@ -651,90 +386,56 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     fontSize: 14,
     fontWeight: '600',
-    lineHeight: 20,
   },
   basePrice: {
-    color: Colors.textTertiary,
+    color: Colors.textLight,
     fontSize: 12,
-    fontWeight: '500',
-    lineHeight: 16,
     textDecorationLine: 'line-through',
   },
   finalPrice: {
     color: Colors.primary,
     fontSize: 22,
     fontWeight: '800',
-    lineHeight: 28,
-    letterSpacing: -0.5,
-  },
-  savingsBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: Colors.successLight,
-    borderRadius: 8,
-    marginTop: 3,
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-  },
-  savingsText: {
-    color: Colors.success,
-    fontSize: 11,
-    fontWeight: '700',
-    lineHeight: 14,
   },
   perPerson: {
-    color: Colors.textTertiary,
+    color: Colors.textLight,
     fontSize: 11,
-    fontWeight: '500',
-    lineHeight: 14,
-    marginTop: 2,
   },
   actionButtons: {
     alignItems: 'flex-end',
-    flexShrink: 0,
     gap: 8,
   },
   compareButton: {
     alignItems: 'center',
-    borderColor: Colors.surfaceBorderStrong,
+    borderColor: Colors.primary,
     borderRadius: 10,
     borderWidth: 1.5,
     flexDirection: 'row',
-    justifyContent: 'center',
+    gap: 4,
     minHeight: 34,
     paddingHorizontal: 10,
-    backgroundColor: Colors.backgroundLayer2,
-    gap: 4,
   },
   compareButtonActive: {
     backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
   },
   compareText: {
-    color: Colors.textSecondary,
+    color: Colors.primary,
     fontSize: 12,
     fontWeight: '600',
-    lineHeight: 16,
   },
   compareTextActive: {
-    color: Colors.white,
+    color: Colors.textWhite,
   },
   viewButton: {
-    alignItems: 'center',
-    backgroundColor: Colors.primary,
+    backgroundColor: Colors.navy,
     borderRadius: 10,
-    justifyContent: 'center',
     minHeight: 38,
     paddingHorizontal: 16,
-    shadowColor: Colors.primary,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.30,
-    shadowRadius: 8,
-    elevation: 5,
+    paddingVertical: 9,
   },
   viewButtonText: {
-    color: Colors.white,
+    color: Colors.textWhite,
     fontSize: 13,
     fontWeight: '700',
-    lineHeight: 18,
   },
 });

@@ -10,11 +10,15 @@ import { CompareRowCells } from './CompareRow';
 import { Colors } from '../../constants/colors';
 import type { PackageListItem } from '../../types';
 
-const fmt = new Intl.NumberFormat('en-IN', {
+const currencyFormatter = new Intl.NumberFormat('en-IN', {
   currency: 'INR',
   maximumFractionDigits: 0,
   style: 'currency',
-}).format;
+});
+
+function fmt(value: number): string {
+  return currencyFormatter.format(value);
+}
 
 function effectivePrice(pkg: PackageListItem): number | null {
   const prices = pkg.pricing.map((p) => p.discounted_price ?? p.base_price);

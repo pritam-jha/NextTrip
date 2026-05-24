@@ -40,6 +40,63 @@ function isValidLocalUri(uri: string): boolean {
   );
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function parseCloudinaryUploadResult(
+  value: unknown
+): { data: CloudinaryUploadResult | null; error: string | null } {
+  if (!isRecord(value)) {
+    return { data: null, error: 'Cloudinary returned an invalid response.' };
+  }
+
+  if (isRecord(value.error)) {
+    const message = value.error.message;
+    return {
+      data: null,
+      error: `Cloudinary error: ${
+        typeof message === 'string' ? message : 'Upload failed.'
+      }`,
+    };
+  }
+
+  const {
+    public_id: publicId,
+    secure_url: secureUrl,
+    original_filename: originalFilename,
+    format,
+    width,
+    height,
+    bytes,
+  } = value;
+
+  if (
+    typeof publicId !== 'string' ||
+    typeof secureUrl !== 'string' ||
+    typeof originalFilename !== 'string' ||
+    typeof format !== 'string' ||
+    typeof width !== 'number' ||
+    typeof height !== 'number' ||
+    typeof bytes !== 'number'
+  ) {
+    return { data: null, error: 'Cloudinary returned incomplete upload data.' };
+  }
+
+  return {
+    data: {
+      public_id: publicId,
+      secure_url: secureUrl,
+      original_filename: originalFilename,
+      format,
+      width,
+      height,
+      bytes,
+    },
+    error: null,
+  };
+}
+
 // ── Public API ────────────────────────────────────────────────────────────────
 
 /**
@@ -60,7 +117,7 @@ function isValidLocalUri(uri: string): boolean {
  */
 export async function uploadImage(
   localUri: string,
-  folder: string = 'xyz'
+  folder: string = 'nexttrp'
 ): Promise<ApiResponse<CloudinaryUploadResult>> {
   try {
     if (!localUri || localUri.trim().length === 0) {
@@ -132,27 +189,14 @@ export async function uploadImage(
       };
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const result: any = await response.json();
+    const result: unknown = await response.json();
+    const parsed = parseCloudinaryUploadResult(result);
 
-    if (result.error) {
-      return {
-        data: null,
-        error: `Cloudinary error: ${result.error.message}`,
-      };
+    if (parsed.error || !parsed.data) {
+      return { data: null, error: parsed.error };
     }
 
-    const uploadResult: CloudinaryUploadResult = {
-      public_id: result.public_id,
-      secure_url: result.secure_url,
-      original_filename: result.original_filename,
-      format: result.format,
-      width: result.width,
-      height: result.height,
-      bytes: result.bytes,
-    };
-
-    return { data: uploadResult, error: null };
+    return { data: parsed.data, error: null };
   } catch (err) {
     return {
       data: null,

@@ -1,7 +1,9 @@
 import type { RequestHandler } from 'express';
 import type { User as SupabaseAuthUser } from '@supabase/supabase-js';
-import { supabase } from '../lib/supabase';
-import type { AuthenticatedUser } from '../types';
+// FIXED: 1 - Validate JWTs with the public client, then read roles with the admin client.
+import { supabaseAdmin, supabasePublic } from '../lib/supabase';
+// FIXED: 2 - Use the shared vendor role constant for the company_owner DB enum.
+import { VENDOR_ROLE, type AuthenticatedUser, type UserRole } from '../types';
 import { ERROR_MESSAGES } from '../constants/errors';
 import { error as errorResponse } from '../utils/response';
 
@@ -19,18 +21,35 @@ const extractBearerToken = (authorizationHeader: string | undefined): string | n
   return token.trim();
 };
 
-const getStringMetadataValue = (value: unknown): string | null => {
-  return typeof value === 'string' && value.trim() !== '' ? value : null;
+const readRole = (value: unknown): UserRole => {
+  // FIXED: 2 - Backend role parsing follows the shared company_owner convention.
+  return value === VENDOR_ROLE || value === 'admin' ? value : 'traveler';
 };
 
-const toAuthenticatedUser = (user: SupabaseAuthUser): AuthenticatedUser => {
-  const appMetadataRole = getStringMetadataValue(user.app_metadata.role);
-  const userMetadataRole = getStringMetadataValue(user.user_metadata.role);
+const fetchDatabaseRole = async (userId: string): Promise<UserRole> => {
+  // FIXED: 1 - public.users.role is the source of truth for authorization.
+  const { data, error } = await supabaseAdmin
+    .from('users')
+    .select('role')
+    .eq('id', userId)
+    .maybeSingle();
 
+  if (error !== null) {
+    throw error;
+  }
+
+  return readRole((data as { role?: unknown } | null)?.role);
+};
+
+const toAuthenticatedUser = (
+  user: SupabaseAuthUser,
+  role: UserRole
+): AuthenticatedUser => {
   return {
     id: user.id,
     email: user.email ?? '',
-    role: appMetadataRole ?? userMetadataRole ?? 'authenticated',
+    // FIXED: 1 - Attach the database role, never a metadata-derived role.
+    role,
   };
 };
 
@@ -45,13 +64,15 @@ export const requireAuth: RequestHandler = async (req, res, next) => {
       return errorResponse(res, ERROR_MESSAGES.AUTH_REQUIRED, 401);
     }
 
-    const { data, error } = await supabase.auth.getUser(token);
+    // FIXED: 1 - JWT validation uses the anon client; role lookup uses public.users.
+    const { data, error } = await supabasePublic.auth.getUser(token);
 
     if (error !== null || data.user === null) {
       return errorResponse(res, ERROR_MESSAGES.INVALID_TOKEN, 401);
     }
 
-    req.user = toAuthenticatedUser(data.user);
+    const role = await fetchDatabaseRole(data.user.id);
+    req.user = toAuthenticatedUser(data.user, role);
     return next();
   } catch (caughtError) {
     return next(caughtError);
@@ -69,10 +90,12 @@ export const optionalAuth: RequestHandler = async (req, _res, next) => {
       return next();
     }
 
-    const { data, error } = await supabase.auth.getUser(token);
+    // FIXED: 1 - Optional auth still reads the database role when a valid JWT exists.
+    const { data, error } = await supabasePublic.auth.getUser(token);
 
     if (error === null && data.user !== null) {
-      req.user = toAuthenticatedUser(data.user);
+      const role = await fetchDatabaseRole(data.user.id);
+      req.user = toAuthenticatedUser(data.user, role);
     }
 
     return next();

@@ -70,11 +70,11 @@ const INITIAL_RATINGS: RatingsState = {
   value: 0,
 };
 
-const RATING_CATEGORIES: Array<{
+const RATING_CATEGORIES: {
   key: keyof RatingsState;
   label: string;
   subtitle: string;
-}> = [
+}[] = [
   {
     key: 'guide',
     label: 'Guide / Tour Manager',
@@ -293,8 +293,14 @@ const overallStyles = StyleSheet.create({
 // ── Main screen ───────────────────────────────────────────────────────────────
 
 export default function WriteReviewScreen(): React.ReactElement {
-  const { bookingId } = useLocalSearchParams<{ bookingId: string }>();
-  const id = Array.isArray(bookingId) ? bookingId[0] : (bookingId ?? '');
+  const params = useLocalSearchParams();
+  const rawBookingId = params.bookingId;
+  const id =
+    typeof rawBookingId === 'string'
+      ? rawBookingId
+      : Array.isArray(rawBookingId)
+      ? rawBookingId[0] ?? ''
+      : '';
 
   const { data: booking, isLoading: bookingLoading } = useBookingDetail(id);
   const submitMutation = useSubmitReview();
@@ -444,7 +450,7 @@ export default function WriteReviewScreen(): React.ReactElement {
           {/* Rating categories */}
           <Text style={styles.sectionLabel}>Rate Your Experience</Text>
           <View style={styles.categoriesCard}>
-            {RATING_CATEGORIES.map((cat, index) => (
+            {RATING_CATEGORIES.map((cat) => (
               <RatingCategory
                 key={cat.key}
                 label={cat.label}

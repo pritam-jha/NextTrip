@@ -26,7 +26,7 @@ export const LABEL_WIDTH = 100;
 export interface CompareHeaderProps {
   packages: PackageListItem[];
   canAddMore: boolean;
-  scrollRef: React.RefObject<ScrollViewType>;
+  scrollRef: React.RefObject<ScrollViewType | null>;
   onScroll: (x: number) => void;
   onRemove: (id: string) => void;
 }

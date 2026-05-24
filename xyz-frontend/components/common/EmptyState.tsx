@@ -1,17 +1,14 @@
 /**
  * @file components/common/EmptyState.tsx
- * @description Glassmorphism Dark empty state — icon glow + animated pulse.
- *
- * ✅ All existing props preserved — zero logic changes.
+ * @description NEXTTRP empty state.
  */
 
-import React, { useEffect, useRef } from 'react';
+import React from 'react';
 import { Animated, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Button } from '../ui/Button';
 import { Colors } from '../../constants/colors';
-
-// ── Types ─────────────────────────────────────────────────────────────────────
+import { usePulse } from '../../utils/animations';
 
 export interface EmptyStateProps {
   icon?: React.ComponentProps<typeof Ionicons>['name'];
@@ -21,8 +18,6 @@ export interface EmptyStateProps {
   onCtaPress?: () => void;
 }
 
-// ── Component ─────────────────────────────────────────────────────────────────
-
 export const EmptyState: React.FC<EmptyStateProps> = ({
   icon = 'map-outline',
   title,
@@ -30,44 +25,21 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
   ctaLabel,
   onCtaPress,
 }) => {
-  const pulse = useRef(new Animated.Value(1)).current;
-
-  useEffect(() => {
-    const anim = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulse, { toValue: 1.08, duration: 1200, useNativeDriver: true }),
-        Animated.timing(pulse, { toValue: 1.0, duration: 1200, useNativeDriver: true }),
-      ])
-    );
-    anim.start();
-    return () => anim.stop();
-  }, [pulse]);
+  const pulse = usePulse();
 
   return (
     <View style={styles.container}>
-      {/* Glow halo behind icon */}
-      <View style={styles.glowHalo} />
-
-      <Animated.View style={[styles.iconWrap, { transform: [{ scale: pulse }] }]}>
-        <Ionicons name={icon} size={36} color={Colors.primary} />
+      <Animated.View style={[styles.iconWrap, pulse.animatedStyle]}>
+        <Ionicons name={icon} size={60} color={Colors.primary} />
       </Animated.View>
-
       <Text style={styles.title}>{title}</Text>
-      {subtitle ? (
-        <Text style={styles.subtitle}>{subtitle}</Text>
-      ) : null}
+      {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
       {ctaLabel && onCtaPress ? (
-        <Button
-          label={ctaLabel}
-          onPress={onCtaPress}
-          style={styles.cta}
-        />
+        <Button label={ctaLabel} onPress={onCtaPress} style={styles.cta} />
       ) : null}
     </View>
   );
 };
-
-// ── Styles ────────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   container: {
@@ -76,43 +48,28 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
     paddingVertical: 48,
   },
-  glowHalo: {
-    position: 'absolute',
-    top: 28,
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: Colors.primaryGlow,
-  },
   iconWrap: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: Colors.surfacePrimary,
-    borderWidth: 1,
-    borderColor: Colors.surfaceBorderStrong,
     alignItems: 'center',
+    backgroundColor: Colors.primaryLight,
+    borderRadius: 30,
+    height: 60,
     justifyContent: 'center',
-    marginBottom: 20,
-    shadowColor: Colors.primary,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.40,
-    shadowRadius: 16,
-    elevation: 8,
+    marginBottom: 18,
+    width: 60,
   },
   title: {
-    fontSize: 20,
+    color: Colors.navy,
+    fontSize: 18,
     fontWeight: '700',
-    color: Colors.textPrimary,
-    textAlign: 'center',
     marginBottom: 8,
+    textAlign: 'center',
   },
   subtitle: {
-    fontSize: 14,
     color: Colors.textSecondary,
+    fontSize: 14,
+    lineHeight: 21,
+    marginBottom: 22,
     textAlign: 'center',
-    lineHeight: 24,
-    marginBottom: 24,
   },
   cta: {
     minWidth: 160,
