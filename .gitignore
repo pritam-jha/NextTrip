@@ -1,7 +1,4 @@
-# Root workspace gitignore
 node_modules/
-.DS_Store
-Thumbs.db
-*.log
-# FIXED: 5 - Keep local frontend/backend dotenv overrides out of git.
-.env.local
+.env
+package-lock.json
+.next/
