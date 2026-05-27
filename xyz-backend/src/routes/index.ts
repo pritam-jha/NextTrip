@@ -8,6 +8,7 @@ import { notificationsRouter } from './notifications';
 import { packagesRouter } from './packages';
 import { reviewsRouter } from './reviews';
 import { usersRouter } from './users';
+import { vendorRouter } from './vendor';
 import { wishlistRouter } from './wishlist';
 
 /**
@@ -25,3 +26,4 @@ apiV1Router.use('/bookings', bookingsRouter);
 apiV1Router.use('/notifications', notificationsRouter);
 apiV1Router.use('/reviews', reviewsRouter);
 apiV1Router.use('/admin', adminRouter);
+apiV1Router.use('/vendor', vendorRouter);

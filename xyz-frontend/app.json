@@ -62,7 +62,8 @@
           "resizeMode": "cover",
           "backgroundColor": "#0B1426"
         }
-      ]
+      ],
+      "expo-web-browser"
     ],
     "scheme": "nexttrp",
     "experiments": {

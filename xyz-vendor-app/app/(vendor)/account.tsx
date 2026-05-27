@@ -1,0 +1,463 @@
+/**
+ * @file app/(vendor)/account.tsx
+ * @description Account tab — user profile, company info, and navigation to
+ * company, reviews, payouts, settings, and notifications.
+ *
+ * Also shows the count of unread notifications as a badge.
+ */
+
+import React from 'react';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { router } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import { useAuthStore } from '../../store/authStore';
+import { useVendorCompany } from '../../hooks/useVendorCompany';
+import { useUnreadNotificationCount } from '../../hooks/useVendorNotifications';
+import { signOut } from '../../lib/api/auth';
+import { Colors } from '../../constants/colors';
+import { Shadows } from '../../constants/shadows';
+
+// ── Menu row ──────────────────────────────────────────────────────────────────
+
+interface MenuRowProps {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  subtitle?: string;
+  onPress: () => void;
+  iconColor?: string;
+  iconBg?: string;
+  badge?: number;
+  danger?: boolean;
+  showChevron?: boolean;
+}
+
+function MenuRow({
+  icon,
+  label,
+  subtitle,
+  onPress,
+  iconColor = Colors.primary,
+  iconBg = Colors.primaryLight,
+  badge,
+  danger = false,
+  showChevron = true,
+}: MenuRowProps): React.ReactElement {
+  return (
+    <Pressable
+      style={({ pressed }) => [styles.menuRow, pressed && styles.pressed]}
+      onPress={onPress}
+      accessibilityRole="button"
+    >
+      <View style={[styles.menuIconBg, { backgroundColor: iconBg }]}>
+        <Ionicons name={icon} size={20} color={iconColor} />
+      </View>
+      <View style={styles.menuText}>
+        <Text style={[styles.menuLabel, danger && styles.dangerText]}>{label}</Text>
+        {subtitle != null && <Text style={styles.menuSubtitle}>{subtitle}</Text>}
+      </View>
+      <View style={styles.menuRight}>
+        {badge != null && badge > 0 && (
+          <View style={styles.badge}>
+            <Text style={styles.badgeText}>{badge > 99 ? '99+' : badge}</Text>
+          </View>
+        )}
+        {showChevron && (
+          <Ionicons name="chevron-forward" size={16} color={Colors.textLight} />
+        )}
+      </View>
+    </Pressable>
+  );
+}
+
+interface MenuSectionProps {
+  title: string;
+  children: React.ReactNode;
+}
+
+function MenuSection({ title, children }: MenuSectionProps): React.ReactElement {
+  return (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>{title}</Text>
+      <View style={[styles.sectionCard, Shadows.sm]}>
+        {children}
+      </View>
+    </View>
+  );
+}
+
+// ── Screen ────────────────────────────────────────────────────────────────────
+
+export default function AccountScreen(): React.ReactElement {
+  const insets = useSafeAreaInsets();
+  const user = useAuthStore((s) => s.user);
+  const { data: company } = useVendorCompany();
+  const unreadCount = useUnreadNotificationCount();
+
+  const handleSignOut = (): void => {
+    Alert.alert(
+      'Sign Out',
+      'Are you sure you want to sign out of the vendor portal?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Sign Out',
+          style: 'destructive',
+          onPress: () => { void signOut(); },
+        },
+      ],
+    );
+  };
+
+  return (
+    <ScrollView
+      style={[styles.scroll, { paddingTop: insets.top }]}
+      contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 32 }]}
+      showsVerticalScrollIndicator={false}
+    >
+      {/* ── Profile card ─────────────────────────────────────────────── */}
+      <View style={[styles.profileCard, Shadows.card]}>
+        <View style={styles.avatarContainer}>
+          <Text style={styles.avatarInitials}>
+            {user?.full_name
+              ? user.full_name.split(' ').map((n) => n[0]).slice(0, 2).join('').toUpperCase()
+              : 'V'}
+          </Text>
+        </View>
+        <View style={styles.profileInfo}>
+          <Text style={styles.profileName}>{user?.full_name ?? 'Vendor'}</Text>
+          <View style={styles.roleRow}>
+            <View style={styles.roleBadge}>
+              <Ionicons name="briefcase" size={10} color={Colors.primary} />
+              <Text style={styles.roleText}>Vendor</Text>
+            </View>
+          </View>
+        </View>
+        <Pressable
+          style={styles.settingsBtn}
+          onPress={() => router.push('/(vendor)/settings')}
+          accessibilityRole="button"
+          accessibilityLabel="Settings"
+        >
+          <Ionicons name="settings-outline" size={20} color={Colors.textSecondary} />
+        </Pressable>
+      </View>
+
+      {/* ── Company card ─────────────────────────────────────────────── */}
+      {company != null && (
+        <Pressable
+          style={[styles.companyCard, Shadows.sm]}
+          onPress={() => router.push('/(vendor)/company')}
+        >
+          <View style={styles.companyLeft}>
+            <View style={[styles.companyIcon, { backgroundColor: Colors.primaryLight }]}>
+              <Ionicons name="business" size={22} color={Colors.primary} />
+            </View>
+            <View style={styles.companyInfo}>
+              <Text style={styles.companyName} numberOfLines={1}>{company.name}</Text>
+              <Text style={styles.companyMeta}>
+                {company.total_packages} packages · {company.avg_rating.toFixed(1)} ★
+              </Text>
+            </View>
+          </View>
+          <View style={[
+            styles.companyStatus,
+            {
+              backgroundColor: company.is_verified
+                ? Colors.successLight
+                : company.status === 'rejected'
+                  ? Colors.errorLight
+                  : Colors.warningLight,
+            },
+          ]}>
+            <Text style={[
+              styles.companyStatusText,
+              {
+                color: company.is_verified
+                  ? Colors.success
+                  : company.status === 'rejected'
+                    ? Colors.error
+                    : Colors.warning,
+              },
+            ]}>
+              {company.is_verified ? 'Verified' : company.status === 'rejected' ? 'Rejected' : 'Pending'}
+            </Text>
+          </View>
+        </Pressable>
+      )}
+
+      {/* ── My Business ──────────────────────────────────────────────── */}
+      <MenuSection title="My Business">
+        <MenuRow
+          icon="business-outline"
+          label="Company Profile"
+          subtitle="Edit details, logo, and documents"
+          onPress={() => router.push('/(vendor)/company')}
+        />
+        <View style={styles.separator} />
+        <MenuRow
+          icon="star-outline"
+          label="Reviews"
+          subtitle="Read feedback from your travelers"
+          onPress={() => router.push('/(vendor)/reviews')}
+          iconColor={Colors.star}
+          iconBg={Colors.accentLight}
+        />
+        <View style={styles.separator} />
+        <MenuRow
+          icon="wallet-outline"
+          label="Payouts"
+          subtitle="Payout history and bank accounts"
+          onPress={() => router.push('/(vendor)/payouts')}
+          iconColor={Colors.success}
+          iconBg={Colors.successLight}
+        />
+      </MenuSection>
+
+      {/* ── App ──────────────────────────────────────────────────────── */}
+      <MenuSection title="App">
+        <MenuRow
+          icon="notifications-outline"
+          label="Notifications"
+          subtitle={unreadCount > 0 ? `${unreadCount} unread` : 'All caught up'}
+          badge={unreadCount}
+          onPress={() => Alert.alert('Notifications', 'Full notification screen coming soon.')}
+          iconColor={Colors.secondary}
+          iconBg={Colors.secondaryLight}
+        />
+        <View style={styles.separator} />
+        <MenuRow
+          icon="settings-outline"
+          label="Settings"
+          subtitle="Profile, password, preferences"
+          onPress={() => router.push('/(vendor)/settings')}
+          iconColor={Colors.navyLight}
+          iconBg={Colors.borderLight}
+        />
+        <View style={styles.separator} />
+        <MenuRow
+          icon="help-circle-outline"
+          label="Help & Support"
+          subtitle="FAQs, contact NEXTTRP team"
+          onPress={() => Alert.alert('Help & Support', 'Please email support@nexttrp.com for assistance.')}
+          iconColor={Colors.info}
+          iconBg={Colors.infoLight}
+        />
+      </MenuSection>
+
+      {/* ── Sign out ─────────────────────────────────────────────────── */}
+      <View style={styles.section}>
+        <View style={[styles.sectionCard, Shadows.sm]}>
+          <MenuRow
+            icon="log-out-outline"
+            label="Sign Out"
+            onPress={handleSignOut}
+            iconColor={Colors.error}
+            iconBg={Colors.errorLight}
+            danger
+            showChevron={false}
+          />
+        </View>
+      </View>
+
+      {/* ── App version ──────────────────────────────────────────────── */}
+      <Text style={styles.version}>NEXTTRP Vendor Portal</Text>
+    </ScrollView>
+  );
+}
+
+// ── Styles ────────────────────────────────────────────────────────────────────
+
+const styles = StyleSheet.create({
+  scroll: {
+    flex: 1,
+    backgroundColor: Colors.background,
+  },
+  content: {
+    paddingHorizontal: 16,
+    paddingTop: 20,
+    gap: 0,
+  },
+  profileCard: {
+    backgroundColor: Colors.backgroundWhite,
+    borderRadius: 20,
+    padding: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+    marginBottom: 12,
+  },
+  avatarContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: Colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarInitials: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: Colors.textWhite,
+  },
+  profileInfo: { flex: 1 },
+  profileName: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: Colors.navy,
+  },
+  roleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+    gap: 6,
+  },
+  roleBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: Colors.primaryLight,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  roleText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: Colors.primary,
+  },
+  settingsBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: Colors.backgroundSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  companyCard: {
+    backgroundColor: Colors.backgroundWhite,
+    borderRadius: 16,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+    marginBottom: 20,
+  },
+  companyLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  companyIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  companyInfo: { flex: 1 },
+  companyName: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: Colors.navy,
+  },
+  companyMeta: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    marginTop: 2,
+  },
+  companyStatus: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  companyStatusText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  section: {
+    marginBottom: 20,
+  },
+  sectionTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: Colors.textLight,
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    marginBottom: 8,
+    marginLeft: 4,
+  },
+  sectionCard: {
+    backgroundColor: Colors.backgroundWhite,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+    overflow: 'hidden',
+  },
+  menuRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    gap: 12,
+  },
+  menuIconBg: {
+    width: 38,
+    height: 38,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  menuText: { flex: 1 },
+  menuLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: Colors.navy,
+  },
+  menuSubtitle: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    marginTop: 1,
+  },
+  menuRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  badge: {
+    backgroundColor: Colors.error,
+    borderRadius: 8,
+    minWidth: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 5,
+  },
+  badgeText: {
+    color: Colors.textWhite,
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  separator: {
+    height: 1,
+    backgroundColor: Colors.borderLight,
+    marginHorizontal: 16,
+  },
+  dangerText: {
+    color: Colors.error,
+  },
+  pressed: { opacity: 0.7 },
+  version: {
+    textAlign: 'center',
+    fontSize: 12,
+    color: Colors.textLight,
+    marginTop: 8,
+    marginBottom: 8,
+  },
+});

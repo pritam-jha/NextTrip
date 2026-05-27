@@ -31,7 +31,7 @@ NEXTTRP Backend is the Node.js and Express API layer for an India-focused travel
    cp .env.example .env
    ```
 
-4. Fill in the Supabase publishable key, Supabase URL, Cloudinary credentials, API base URL, CORS origins, and rate limit values in `.env`. For trusted backend-only deployments, also set `SUPABASE_SERVICE_ROLE_KEY`.
+4. Fill in the Supabase URL, anon key, service role key, Cloudinary credentials, API base URL, CORS origins, and rate limit values in `.env`. The backend requires `SUPABASE_SERVICE_ROLE_KEY` at startup because trusted server-side routes use the Supabase admin client.
 5. Start the development server:
 
    ```bash

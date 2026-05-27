@@ -47,6 +47,7 @@ API_BASE_URL=http://localhost:3000
 
 SUPABASE_URL=https://rtyvmyvidkrwmeeeioww.supabase.co
 SUPABASE_ANON_KEY=<get from project owner>
+SUPABASE_SERVICE_ROLE_KEY=<get from project owner>
 
 CLOUDINARY_CLOUD_NAME=your-cloud-name
 CLOUDINARY_API_KEY=your-api-key
@@ -163,6 +164,7 @@ NEXTTRP/
 | `PORT` | Server port (default: 3000) |
 | `SUPABASE_URL` | Supabase project URL |
 | `SUPABASE_ANON_KEY` | Supabase JWT anon key (starts with `eyJ...`) |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role JWT key for backend-only admin access |
 | `ALLOWED_ORIGINS` | Comma-separated CORS origins |
 
 ### Frontend (`NEXTTRP-frontend/.env`)
