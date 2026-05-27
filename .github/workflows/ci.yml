@@ -34,7 +34,7 @@ jobs:
 
       - name: Install admin-app deps
         working-directory: xyz-admin-app
-        run: npm ci --frozen-lockfile
+        run: npm install --ignore-scripts
 
       # admin-app uses expo's default TypeScript strict mode; run tsc for
       # linting since there is no separate eslint config there yet.
@@ -68,7 +68,7 @@ jobs:
 
       - name: Install admin-app deps
         working-directory: xyz-admin-app
-        run: npm ci --frozen-lockfile
+        run: npm install --ignore-scripts
 
       - name: Type-check admin-app
         working-directory: xyz-admin-app
