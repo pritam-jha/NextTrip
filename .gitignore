@@ -2,7 +2,6 @@
 .env.*
 node_modules/
 .next/
-package-lock.json
 
 # Runtime log files — never commit these
 *.log
