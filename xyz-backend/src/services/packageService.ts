@@ -4,10 +4,7 @@ import { supabasePublic } from '../lib/supabase';
 import { logger } from '../utils/logger';
 import type {
   Badge,
-  Category,
-  Company,
   Itinerary,
-  Location,
   Package,
   PackageDetail,
   PackageImage,

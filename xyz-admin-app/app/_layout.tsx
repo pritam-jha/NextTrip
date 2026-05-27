@@ -76,7 +76,7 @@ function AuthBootstrap(): null {
     // Listen for auth state changes (token revocation, sign-out from another tab,
     // or a failed token refresh — e.g. "Invalid Refresh Token" after server reset).
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_OUT' || event === 'TOKEN_REFRESH_FAILED' || !session) {
+      if (event === 'SIGNED_OUT' || !session) {
         try { await supabase.auth.signOut(); } catch { /* already signed out */ }
         clearUser();
         router.replace('/(auth)/login');
