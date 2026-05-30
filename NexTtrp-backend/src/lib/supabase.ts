@@ -27,19 +27,31 @@ const supabaseAnonKey = getRequiredEnv([
 
 const supabaseServiceRoleKey = getRequiredEnv(['SUPABASE_SERVICE_ROLE_KEY']);
 
-// Node.js 22+ has native WebSocket — no polyfill needed.
-// The Dockerfile uses node:22-alpine which satisfies this requirement.
+// ── WebSocket polyfill for Node.js < 22 ──────────────────────────────────────
+// Node 22+ has a native WebSocket global; older versions need the 'ws' package.
+// We detect the version at runtime and pass 'ws' as the realtime transport when
+// needed. This makes the code work on both Node 20 and Node 22.
+
+function getRealtimeOptions(): Record<string, unknown> {
+  const [major] = process.versions.node.split('.').map(Number);
+  if (major < 22) {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const ws = require('ws') as unknown;
+    return { transport: ws };
+  }
+  return {};
+}
+
+const realtimeOptions = getRealtimeOptions();
 
 export const supabasePublic: SupabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false,
-  },
+  auth: { autoRefreshToken: false, persistSession: false },
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  realtime: realtimeOptions as any,
 });
 
 export const supabaseAdmin: SupabaseClient = createClient(supabaseUrl, supabaseServiceRoleKey, {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false,
-  },
+  auth: { autoRefreshToken: false, persistSession: false },
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  realtime: realtimeOptions as any,
 });
