@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import ws from 'ws';
 
 const getRequiredEnv = (keys: string[]): string => {
   for (const key of keys) {
@@ -19,36 +20,33 @@ const supabaseUrl = getRequiredEnv([
   'EXPO_PUBLIC_SUPABASE_URL',
 ]);
 
-// FIXED: 4 - Keep the public JWT client separate from privileged backend access.
 const supabaseAnonKey = getRequiredEnv([
   'SUPABASE_ANON_KEY',
   'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
   'EXPO_PUBLIC_SUPABASE_ANON_KEY',
 ]);
 
-// FIXED: 4 - Require the backend-only service role key for trusted server operations.
 const supabaseServiceRoleKey = getRequiredEnv(['SUPABASE_SERVICE_ROLE_KEY']);
 
-/**
- * Supabase client configured with the public anon key.
- * Use this for auth token validation and other non-privileged operations.
- */
-// FIXED: 4 - Public client is explicitly named so it is not confused with admin access.
+// Node.js 20 does not have a native WebSocket global.
+// Passing the 'ws' package as the realtime transport fixes the crash:
+//   "Error: Node.js 20 detected without native WebSocket support."
+// Node.js 22+ has native WebSocket so this is harmless on newer runtimes.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const realtimeOptions = { transport: ws as any };
+
 export const supabasePublic: SupabaseClient = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     autoRefreshToken: false,
     persistSession: false,
   },
+  realtime: realtimeOptions,
 });
 
-/**
- * Supabase service-role client for backend-only trusted operations.
- * Never expose SUPABASE_SERVICE_ROLE_KEY to the frontend.
- */
-// FIXED: 4 - Admin client is explicitly named for RLS-bypassing backend work.
 export const supabaseAdmin: SupabaseClient = createClient(supabaseUrl, supabaseServiceRoleKey, {
   auth: {
     autoRefreshToken: false,
     persistSession: false,
   },
+  realtime: realtimeOptions,
 });

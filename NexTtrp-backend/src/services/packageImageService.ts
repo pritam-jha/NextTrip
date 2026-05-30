@@ -282,7 +282,7 @@ export const deletePackageImage = async (
   // Best-effort Cloudinary deletion — log but don't fail if the asset is gone
   if (publicId) {
     try {
-      await cloudinary.uploader.destroy(publicId);
+      await cloudinary().uploader.destroy(publicId);
     } catch (err) {
       logger.warn({ err }, 'deletePackageImage: Cloudinary delete failed (non-fatal)');
     }
