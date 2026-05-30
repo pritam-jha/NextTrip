@@ -23,6 +23,9 @@ import { success, validationError, error as errorResponse } from '../utils/respo
 import { UuidParamSchema } from '../utils/validation';
 
 const isProduction = process.env.NODE_ENV === 'production';
+// Set ENABLE_MOCK_PAYMENT=true in your deployment env to keep mock payment
+// active for soft-launch testing even when NODE_ENV=production.
+const mockPaymentEnabled = process.env.ENABLE_MOCK_PAYMENT === 'true';
 
 export const bookingsRouter = Router();
 
@@ -170,7 +173,7 @@ bookingsRouter.post('/create', async (req, res, next) => {
  * NOTE: Replace this endpoint with Razorpay signature verification before launch.
  */
 bookingsRouter.post('/confirm-mock', async (req, res, next) => {
-  if (isProduction) {
+  if (isProduction && !mockPaymentEnabled) {
     return errorResponse(res, 'Mock payment is not available in production', 410);
   }
 
