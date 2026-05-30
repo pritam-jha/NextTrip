@@ -135,7 +135,7 @@ export function ScreenLayout({
   }
 
   return (
-    <SafeAreaView edges={['top', 'left', 'right']} style={[styles.safe, { backgroundColor: background }]}>
+    <SafeAreaView edges={['top', 'left', 'right', 'bottom']} style={[styles.safe, { backgroundColor: background }]}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.kav}

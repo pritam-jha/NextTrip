@@ -1,154 +1,327 @@
 /**
  * @file components/admin/AuditLogItem.tsx
- * Compact audit log row with action, entity, actor, metadata, and timestamp.
+ * Human-readable audit log row.
+ *
+ * Converts raw DB action strings and metadata into plain-English sentences
+ * so administrators can understand the activity trail at a glance.
  */
 
-import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import React, { useState } from 'react';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Colors } from '../../constants/colors';
 import { FontWeight, Radius, Spacing } from '../../constants/theme';
 import type { AdminAuditLog } from '../../types/admin';
+
+// ── Action label map ──────────────────────────────────────────────────────────
+// Maps raw DB action keys to short, plain-English sentences.
+
+const ACTION_LABELS: Record<string, string> = {
+  // Vendor
+  approve_vendor:               'Approved vendor',
+  reject_vendor:                'Rejected vendor',
+  verify_vendor:                'Verified vendor',
+  // Package
+  approve_package:              'Approved package',
+  reject_package:               'Rejected package',
+  feature_package:              'Featured package',
+  unfeature_package:            'Removed featured flag',
+  set_bestseller_package:       'Marked package as bestseller',
+  unset_bestseller_package:     'Removed bestseller badge',
+  // Booking
+  update_booking_status_confirmed: 'Confirmed booking',
+  update_booking_status_cancelled: 'Cancelled booking',
+  update_booking_status_completed: 'Completed booking',
+  update_booking_status_pending:   'Reset booking to pending',
+  // Reviews
+  publish_review:               'Published review',
+  unpublish_review:             'Unpublished review',
+  verify_review:                'Verified review',
+  // Payouts
+  update_payout_status:         'Updated payout status',
+  // Users
+  update_user_role:             'Changed user role',
+  // Categories & Locations
+  create_category:              'Created category',
+  update_category:              'Updated category',
+  delete_category:              'Deleted category',
+  create_location:              'Created location',
+  update_location:              'Updated location',
+  delete_location:              'Deleted location',
+};
+
+function getActionLabel(action: string): string {
+  return ACTION_LABELS[action] ?? action.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+// ── Action colour ─────────────────────────────────────────────────────────────
+
+const ACTION_COLORS: Record<string, string> = {
+  approve_vendor:               Colors.success,
+  reject_vendor:                Colors.error,
+  verify_vendor:                Colors.secondary,
+  approve_package:              Colors.success,
+  reject_package:               Colors.error,
+  feature_package:              Colors.accent,
+  unfeature_package:            Colors.textSecondary,
+  set_bestseller_package:       Colors.accent,
+  unset_bestseller_package:     Colors.textSecondary,
+  update_booking_status_confirmed: Colors.success,
+  update_booking_status_cancelled: Colors.error,
+  update_booking_status_completed: Colors.secondary,
+  update_booking_status_pending:   Colors.warning,
+  publish_review:               Colors.success,
+  unpublish_review:             Colors.warning,
+  verify_review:                Colors.secondary,
+  update_payout_status:         Colors.primary,
+  update_user_role:             Colors.primary,
+  create_category:              Colors.primary,
+  update_category:              Colors.secondary,
+  delete_category:              Colors.error,
+  create_location:              Colors.primary,
+  update_location:              Colors.secondary,
+  delete_location:              Colors.error,
+};
+
+function getActionColor(action: string): string {
+  return ACTION_COLORS[action] ?? Colors.textSecondary;
+}
+
+// ── Entity icon + label ───────────────────────────────────────────────────────
+
+type MCIcon = React.ComponentProps<typeof MaterialCommunityIcons>['name'];
+
+const ENTITY_META: Record<string, { icon: MCIcon; label: string }> = {
+  vendor:   { icon: 'office-building',  label: 'Vendor' },
+  package:  { icon: 'package-variant',  label: 'Package' },
+  booking:  { icon: 'calendar-check',   label: 'Booking' },
+  review:   { icon: 'star',             label: 'Review' },
+  category: { icon: 'tag',              label: 'Category' },
+  location: { icon: 'map-marker',       label: 'Location' },
+  payout:   { icon: 'cash',             label: 'Payout' },
+  user:     { icon: 'account',          label: 'User' },
+};
+
+// ── Metadata → human-readable detail lines ────────────────────────────────────
+
+const META_LABELS: Record<string, string> = {
+  reason:       'Reason',
+  note:         'Note',
+  new_status:   'New status',
+  new_role:     'New role',
+  is_featured:  'Featured',
+  is_bestseller:'Bestseller',
+  from_role:    'From role',
+  to_role:      'To role',
+};
+
+function buildDetailLines(metadata: Record<string, unknown>): string[] {
+  const lines: string[] = [];
+
+  for (const [key, val] of Object.entries(metadata)) {
+    if (val === null || val === undefined || val === '') continue;
+
+    const label = META_LABELS[key];
+    if (!label) continue; // skip internal/developer keys we don't want to show
+
+    let display: string;
+    if (typeof val === 'boolean') {
+      display = val ? 'Yes' : 'No';
+    } else if (typeof val === 'string' || typeof val === 'number') {
+      display = String(val);
+    } else {
+      continue;
+    }
+
+    lines.push(`${label}: ${display}`);
+  }
+
+  return lines;
+}
+
+// ── Timestamp ─────────────────────────────────────────────────────────────────
+
+function formatTimestamp(iso: string): string {
+  const d = new Date(iso);
+  if (!Number.isFinite(d.getTime())) return '—';
+
+  const diff = Date.now() - d.getTime();
+  const mins = Math.floor(diff / 60_000);
+  if (mins < 1) return 'Just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  if (hours < 48) return 'Yesterday';
+
+  return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function formatFullTimestamp(iso: string): string {
+  const d = new Date(iso);
+  if (!Number.isFinite(d.getTime())) return '—';
+  return d.toLocaleString('en-IN', {
+    day: 'numeric', month: 'short', year: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  });
+}
+
+// ── Component ─────────────────────────────────────────────────────────────────
 
 interface AuditLogItemProps {
   log: AdminAuditLog;
 }
 
-const ACTION_COLORS: Record<string, string> = {
-  approve: Colors.success,
-  reject: Colors.error,
-  verify: Colors.secondary,
-  publish: Colors.success,
-  unpublish: Colors.warning,
-  delete: Colors.error,
-  create: Colors.primary,
-  update: Colors.secondary,
-  feature: Colors.accent,
-  unfeature: Colors.textSecondary,
-  set_bestseller: Colors.accent,
-  unset_bestseller: Colors.textSecondary,
-};
-
-function getActionColor(action: string): string {
-  const key = Object.keys(ACTION_COLORS).find((k) => action.startsWith(k));
-  return key ? (ACTION_COLORS[key] ?? Colors.textSecondary) : Colors.textSecondary;
-}
-
-function titleCase(value: string): string {
-  return value
-    .replace(/_/g, ' ')
-    .replace(/\b\w/g, (c) => c.toUpperCase());
-}
-
-function relativeTime(isoDate: string): string {
-  const ts = new Date(isoDate).getTime();
-  if (!Number.isFinite(ts)) return 'Unknown time';
-  const diff = Date.now() - ts;
-  const minutes = Math.floor(diff / 60000);
-  if (minutes < 1) return 'Just now';
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 30) return `${days}d ago`;
-  return new Date(isoDate).toLocaleDateString('en-IN', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
-}
-
 export function AuditLogItem({ log }: AuditLogItemProps): React.ReactElement {
-  const actionColor = getActionColor(log.action);
-  const adminName = log.admin?.full_name ?? log.admin?.email ?? log.admin_id.slice(0, 8);
-  const metaKeys = Object.keys(log.metadata ?? {}).filter((k) => k !== 'note');
-  const entityId = log.entity_id ? log.entity_id.slice(0, 8) : null;
+  const [expanded, setExpanded] = useState(false);
+
+  const actionColor  = getActionColor(log.action);
+  const actionLabel  = getActionLabel(log.action);
+  const entityMeta   = ENTITY_META[log.entity_type] ?? { icon: 'information-outline' as MCIcon, label: log.entity_type };
+  const adminName    = log.admin?.full_name?.trim() || log.admin?.email || 'Admin';
+  const detailLines  = buildDetailLines(log.metadata ?? {});
 
   return (
-    <View style={styles.container}>
-      <View style={[styles.actionRail, { backgroundColor: actionColor }]} />
-      <View style={styles.content}>
-        <View style={styles.topRow}>
-          <View style={[styles.actionBadge, { backgroundColor: `${actionColor}18` }]}>
-            <Text style={[styles.actionText, { color: actionColor }]}>
-              {titleCase(log.action)}
-            </Text>
-          </View>
-          <Text style={styles.timeText}>{relativeTime(log.created_at)}</Text>
+    <TouchableOpacity
+      activeOpacity={0.75}
+      onPress={() => setExpanded((v) => !v)}
+      accessibilityRole="button"
+      accessibilityLabel={`${actionLabel}, ${entityMeta.label}, by ${adminName}`}
+    >
+      <View style={styles.row}>
+        {/* Colour rail */}
+        <View style={[styles.rail, { backgroundColor: actionColor }]} />
+
+        {/* Entity icon bubble */}
+        <View style={[styles.iconBubble, { backgroundColor: `${actionColor}14` }]}>
+          <MaterialCommunityIcons name={entityMeta.icon} size={18} color={actionColor} />
         </View>
 
-        <Text style={styles.entityText} numberOfLines={1}>
-          {titleCase(log.entity_type)}
-          {entityId ? <Text style={styles.entityId}> / {entityId}</Text> : null}
-        </Text>
+        {/* Main content */}
+        <View style={styles.body}>
+          {/* Line 1: action label + timestamp */}
+          <View style={styles.headline}>
+            <Text style={[styles.actionLabel, { color: actionColor }]} numberOfLines={1}>
+              {actionLabel}
+            </Text>
+            <Text style={styles.timestamp}>{formatTimestamp(log.created_at)}</Text>
+          </View>
 
-        <Text style={styles.actorText} numberOfLines={1}>
-          By {adminName}
-        </Text>
-
-        {metaKeys.length > 0 && (
-          <Text style={styles.metaText} numberOfLines={1}>
-            {metaKeys.map((k) => `${k}: ${String(log.metadata[k])}`).join('  |  ')}
+          {/* Line 2: entity type */}
+          <Text style={styles.entityLine} numberOfLines={1}>
+            {entityMeta.label}
           </Text>
+
+          {/* Line 3: who did it */}
+          <Text style={styles.actorLine} numberOfLines={1}>
+            By {adminName}
+          </Text>
+
+          {/* Expanded: detail lines + full timestamp */}
+          {expanded && detailLines.length > 0 && (
+            <View style={styles.details}>
+              {detailLines.map((line) => (
+                <Text key={line} style={styles.detailLine}>
+                  {line}
+                </Text>
+              ))}
+            </View>
+          )}
+
+          {expanded && (
+            <Text style={styles.fullTimestamp}>{formatFullTimestamp(log.created_at)}</Text>
+          )}
+        </View>
+
+        {/* Expand chevron — only when there are details */}
+        {detailLines.length > 0 && (
+          <MaterialCommunityIcons
+            name={expanded ? 'chevron-up' : 'chevron-down'}
+            size={16}
+            color={Colors.textLight}
+            style={styles.chevron}
+          />
         )}
       </View>
-    </View>
+    </TouchableOpacity>
   );
 }
 
+// ── Styles ────────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
-  container: {
+  row: {
     flexDirection: 'row',
+    alignItems: 'flex-start',
     backgroundColor: Colors.surface,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: Colors.divider,
-  },
-  actionRail: {
-    width: 3,
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,
-    gap: Spacing.xs,
+    paddingRight: Spacing.md,
   },
-  topRow: {
+  rail: {
+    width: 3,
+    alignSelf: 'stretch',
+  },
+  iconBubble: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginHorizontal: Spacing.md,
+    flexShrink: 0,
+    marginTop: 2,
+  },
+  body: {
+    flex: 1,
+    gap: 3,
+  },
+  headline: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: Spacing.md,
+    gap: Spacing.sm,
   },
-  actionBadge: {
-    alignSelf: 'flex-start',
-    borderRadius: Radius.sm,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 3,
-  },
-  actionText: {
-    fontSize: 12,
+  actionLabel: {
+    fontSize: 14,
     fontWeight: FontWeight.bold,
+    flex: 1,
   },
-  timeText: {
-    fontSize: 12,
+  timestamp: {
+    fontSize: 11,
     color: Colors.textLight,
     fontWeight: FontWeight.medium,
+    flexShrink: 0,
   },
-  entityText: {
-    fontSize: 14,
+  entityLine: {
+    fontSize: 13,
     color: Colors.text,
     fontWeight: FontWeight.semibold,
   },
-  entityId: {
-    color: Colors.textLight,
-    fontWeight: FontWeight.medium,
-    fontSize: 12,
-  },
-  actorText: {
+  actorLine: {
     fontSize: 12,
     color: Colors.textSecondary,
   },
-  metaText: {
+  details: {
+    marginTop: 6,
+    gap: 3,
+    backgroundColor: Colors.backgroundSoft,
+    borderRadius: Radius.sm,
+    padding: Spacing.sm,
+  },
+  detailLine: {
     fontSize: 12,
+    color: Colors.textSecondary,
+    lineHeight: 18,
+  },
+  fullTimestamp: {
+    fontSize: 11,
     color: Colors.textLight,
-    lineHeight: 17,
+    marginTop: 4,
+  },
+  chevron: {
+    marginTop: 10,
+    marginLeft: Spacing.sm,
+    flexShrink: 0,
   },
 });

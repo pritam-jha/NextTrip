@@ -73,8 +73,13 @@ export function useApproveVendor(): UseMutationResult<AdminVendor, Error, { vend
       if (res.error || !res.data) throw new Error(res.error ?? 'Failed to approve vendor');
       return res.data;
     },
-    onSuccess: (vendor) => {
-      queryClient.setQueryData(adminVendorQueryKeys.detail(vendor.id), vendor);
+    onSuccess: (_vendor, { vendorId }) => {
+      // Invalidate the specific detail key (uses URL vendorId, not response id,
+      // so the cache key always matches the query running on the screen).
+      void queryClient.invalidateQueries({
+        queryKey: adminVendorQueryKeys.detail(vendorId),
+      });
+      // Invalidate the list so status badge updates on back-navigation.
       void queryClient.invalidateQueries({ queryKey: adminVendorQueryKeys.all });
     },
   });
@@ -88,8 +93,10 @@ export function useRejectVendor(): UseMutationResult<AdminVendor, Error, { vendo
       if (res.error || !res.data) throw new Error(res.error ?? 'Failed to reject vendor');
       return res.data;
     },
-    onSuccess: (vendor) => {
-      queryClient.setQueryData(adminVendorQueryKeys.detail(vendor.id), vendor);
+    onSuccess: (_vendor, { vendorId }) => {
+      void queryClient.invalidateQueries({
+        queryKey: adminVendorQueryKeys.detail(vendorId),
+      });
       void queryClient.invalidateQueries({ queryKey: adminVendorQueryKeys.all });
     },
   });
@@ -103,8 +110,10 @@ export function useVerifyVendor(): UseMutationResult<AdminVendor, Error, string>
       if (res.error || !res.data) throw new Error(res.error ?? 'Failed to verify vendor');
       return res.data;
     },
-    onSuccess: (vendor) => {
-      queryClient.setQueryData(adminVendorQueryKeys.detail(vendor.id), vendor);
+    onSuccess: (_vendor, vendorId) => {
+      void queryClient.invalidateQueries({
+        queryKey: adminVendorQueryKeys.detail(vendorId),
+      });
       void queryClient.invalidateQueries({ queryKey: adminVendorQueryKeys.all });
     },
   });

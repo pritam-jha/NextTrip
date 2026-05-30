@@ -68,7 +68,7 @@ export default function AdminAuditLogsScreen(): React.ReactElement {
   return (
     <ScreenLayout
       title="Audit Logs"
-      subtitle={data ? `${data.total} records` : 'Read-only activity trail'}
+      subtitle={data ? `${data.total} actions recorded` : 'What admins have done'}
       onBack={() => router.back()}
       scrollable={false}
       contentPadding={false}
@@ -86,13 +86,6 @@ export default function AdminAuditLogsScreen(): React.ReactElement {
         />
       }
     >
-      <View style={styles.summaryRow}>
-        <Text style={styles.summaryTitle}>Admin activity</Text>
-        <Text style={styles.summaryText}>
-          Every moderation and operations action is captured for review.
-        </Text>
-      </View>
-
       <StatusFilterTabs
         tabs={ENTITY_TABS}
         selected={entityFilter}
@@ -169,24 +162,6 @@ export default function AdminAuditLogsScreen(): React.ReactElement {
 }
 
 const styles = StyleSheet.create({
-  summaryRow: {
-    backgroundColor: Colors.surface,
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Colors.border,
-  },
-  summaryTitle: {
-    fontSize: 13,
-    fontWeight: FontWeight.bold,
-    color: Colors.text,
-  },
-  summaryText: {
-    fontSize: 12,
-    color: Colors.textSecondary,
-    marginTop: 2,
-    lineHeight: 17,
-  },
   list: {
     flex: 1,
     backgroundColor: Colors.surface,

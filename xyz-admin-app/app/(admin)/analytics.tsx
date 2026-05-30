@@ -79,8 +79,12 @@ export default function AdminAnalyticsScreen(): React.ReactElement {
   const maxRevenue = Math.max(...revenueData.map((m) => m.revenue), 1);
   const funnel = data?.booking_funnel ?? { pending: 0, confirmed: 0, completed: 0, cancelled: 0 };
 
-  const totalRevenue = revenueData.reduce((s, m) => s + m.revenue, 0);
-  const totalBookings = revenueData.reduce((s, m) => s + m.bookings, 0);
+  // Revenue = confirmed + completed bookings only (last 6 months)
+  const windowRevenue = revenueData.reduce((s, m) => s + m.revenue, 0);
+  // Bookings = all statuses received in the window (pending, confirmed, completed, cancelled)
+  const windowBookings = revenueData.reduce((s, m) => s + m.bookings, 0);
+  // Confirmed + completed only (paid bookings)
+  const paidBookings = (data?.booking_funnel.confirmed ?? 0) + (data?.booking_funnel.completed ?? 0);
 
   return (
     <ScreenLayout
@@ -96,12 +100,24 @@ export default function AdminAnalyticsScreen(): React.ReactElement {
       {/* ── Summary tiles ── */}
       <View style={styles.tileRow}>
         <View style={styles.tile}>
-          <Text style={styles.tileLabel}>Total Revenue</Text>
-          <Text style={styles.tileValue}>{formatINR(totalRevenue)}</Text>
+          <Text style={styles.tileLabel}>Revenue (6 mo)</Text>
+          <Text style={styles.tileValue}>{formatINR(windowRevenue)}</Text>
         </View>
         <View style={styles.tile}>
-          <Text style={styles.tileLabel}>Total Bookings</Text>
-          <Text style={styles.tileValue}>{totalBookings.toLocaleString('en-IN')}</Text>
+          <Text style={styles.tileLabel}>Paid Bookings</Text>
+          <Text style={styles.tileValue}>{paidBookings.toLocaleString('en-IN')}</Text>
+        </View>
+      </View>
+      <View style={styles.tileRow}>
+        <View style={styles.tile}>
+          <Text style={styles.tileLabel}>Total Received (6 mo)</Text>
+          <Text style={styles.tileValue}>{windowBookings.toLocaleString('en-IN')}</Text>
+        </View>
+        <View style={styles.tile}>
+          <Text style={styles.tileLabel}>Cancelled (6 mo)</Text>
+          <Text style={[styles.tileValue, { color: Colors.error }]}>
+            {(data?.booking_funnel.cancelled ?? 0).toLocaleString('en-IN')}
+          </Text>
         </View>
       </View>
 

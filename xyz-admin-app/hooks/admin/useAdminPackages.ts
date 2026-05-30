@@ -68,8 +68,10 @@ export function useApprovePackage(): UseMutationResult<AdminPackageListItem, Err
       if (res.error || !res.data) throw new Error(res.error ?? 'Failed to approve package');
       return res.data;
     },
-    onSuccess: (pkg) => {
-      queryClient.setQueryData(adminPackageQueryKeys.detail(pkg.id), pkg);
+    onSuccess: (_pkg, { packageId }) => {
+      void queryClient.invalidateQueries({
+        queryKey: adminPackageQueryKeys.detail(packageId),
+      });
       void queryClient.invalidateQueries({ queryKey: adminPackageQueryKeys.all });
     },
   });
@@ -83,8 +85,10 @@ export function useRejectPackage(): UseMutationResult<AdminPackageListItem, Erro
       if (res.error || !res.data) throw new Error(res.error ?? 'Failed to reject package');
       return res.data;
     },
-    onSuccess: (pkg) => {
-      queryClient.setQueryData(adminPackageQueryKeys.detail(pkg.id), pkg);
+    onSuccess: (_pkg, { packageId }) => {
+      void queryClient.invalidateQueries({
+        queryKey: adminPackageQueryKeys.detail(packageId),
+      });
       void queryClient.invalidateQueries({ queryKey: adminPackageQueryKeys.all });
     },
   });
@@ -98,8 +102,10 @@ export function useFeaturePackage(): UseMutationResult<AdminPackageListItem, Err
       if (res.error || !res.data) throw new Error(res.error ?? 'Failed to update package');
       return res.data;
     },
-    onSuccess: (pkg) => {
-      queryClient.setQueryData(adminPackageQueryKeys.detail(pkg.id), pkg);
+    onSuccess: (_pkg, { packageId }) => {
+      void queryClient.invalidateQueries({
+        queryKey: adminPackageQueryKeys.detail(packageId),
+      });
       void queryClient.invalidateQueries({ queryKey: adminPackageQueryKeys.all });
     },
   });

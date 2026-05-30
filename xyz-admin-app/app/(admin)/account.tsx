@@ -20,6 +20,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Colors } from '../../constants/colors';
 import { FontWeight, Radius, Spacing } from '../../constants/theme';
+import { useQueryClient } from '@tanstack/react-query';
 import { signOut } from '../../lib/api/auth';
 import { useAuthStore } from '../../store/authStore';
 import { useAdminUnreadCount } from '../../hooks/admin/useAdminNotifications';
@@ -90,7 +91,9 @@ function MenuSection({ title, children }: MenuSectionProps): React.ReactElement 
 
 export default function AdminAccountScreen(): React.ReactElement {
   const user = useAuthStore((s) => s.user);
+  const clearUser = useAuthStore((s) => s.clearUser);
   const unreadCount = useAdminUnreadCount();
+  const queryClient = useQueryClient();
 
   const initials = (user?.full_name ?? 'Admin')
     .split(' ')
@@ -108,7 +111,21 @@ export default function AdminAccountScreen(): React.ReactElement {
         {
           text: 'Sign Out',
           style: 'destructive',
-          onPress: () => { void signOut(); },
+          onPress: () => {
+            // Sign out then explicitly clear local state and navigate.
+            // Not relying solely on onAuthStateChange in _layout.tsx to
+            // handle navigation — that callback is async and can miss the
+            // navigation call due to timing.
+            void signOut()
+              .catch(() => {
+                // If Supabase sign-out fails (e.g. already expired), proceed anyway.
+              })
+              .finally(() => {
+                clearUser();
+                queryClient.clear();
+                router.replace('/(auth)/login');
+              });
+          },
         },
       ],
     );
@@ -151,7 +168,7 @@ export default function AdminAccountScreen(): React.ReactElement {
             label="Notifications"
             subtitle={unreadCount > 0 ? `${unreadCount} unread` : 'All caught up'}
             badge={unreadCount}
-            onPress={() => router.push('/(admin)/notifications')}
+            onPress={() => router.push('/(admin)/notifications' as never)}
           />
           <View style={styles.separator} />
           <MenuRow

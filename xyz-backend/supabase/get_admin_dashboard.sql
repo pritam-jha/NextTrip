@@ -23,8 +23,8 @@ BEGIN
     'active_packages',        (SELECT COUNT(*)          FROM packages     WHERE status = 'active'),
     'total_bookings',         (SELECT COUNT(*)          FROM bookings),
     'bookings_this_month',    (SELECT COUNT(*)          FROM bookings     WHERE created_at >= v_month_start),
-    'total_revenue',          (SELECT COALESCE(SUM(amount), 0) FROM payments),
-    'revenue_this_month',     (SELECT COALESCE(SUM(amount), 0) FROM payments         WHERE created_at >= v_month_start),
+    'total_revenue',          (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE status = 'paid'),
+    'revenue_this_month',     (SELECT COALESCE(SUM(amount), 0) FROM payments WHERE status = 'paid' AND created_at >= v_month_start),
     'pending_reviews',        (SELECT COUNT(*)          FROM reviews      WHERE is_published = false),
     'pending_payouts',        (SELECT COUNT(*)          FROM vendor_payouts WHERE status = 'pending')
   )

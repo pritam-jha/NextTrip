@@ -62,8 +62,12 @@ export function useUpdateBookingStatus(): UseMutationResult<
       if (res.error || !res.data) throw new Error(res.error ?? 'Failed to update booking');
       return res.data;
     },
-    onSuccess: (booking) => {
-      queryClient.setQueryData(adminBookingQueryKeys.detail(booking.id), booking);
+    onSuccess: (_booking, { bookingId }) => {
+      // Invalidate by the URL bookingId (same key the screen's query was registered with)
+      // rather than booking.id from the response, so the cache key always matches.
+      void queryClient.invalidateQueries({
+        queryKey: adminBookingQueryKeys.detail(bookingId),
+      });
       void queryClient.invalidateQueries({ queryKey: adminBookingQueryKeys.all });
     },
   });

@@ -256,10 +256,10 @@ async function getDashboardFallback(): Promise<AdminDashboardMetrics> {
   const cnt = (r: { count: number | null }): number => r.count ?? 0;
 
   // ── Revenue aggregates (PostgREST column alias syntax: total:col.sum()) ────
-  // Returns a single row: { total: "12345.00" }
+  // Filter to status='paid' only — excludes failed, refunded, and mock payments.
   const [revAll, revMonth] = await Promise.all([
-    supabaseAdmin.from('payments').select('total:amount.sum()').maybeSingle(),
-    supabaseAdmin.from('payments').select('total:amount.sum()').gte('created_at', ms).maybeSingle(),
+    supabaseAdmin.from('payments').select('total:amount.sum()').eq('status', 'paid').maybeSingle(),
+    supabaseAdmin.from('payments').select('total:amount.sum()').eq('status', 'paid').gte('created_at', ms).maybeSingle(),
   ]);
 
   const sumOf = (r: { data: unknown }): number => {
@@ -926,24 +926,19 @@ export async function updateBookingStatus(
   changedBy: string,
   note?: string,
 ): Promise<AdminBooking> {
+  // Fetch current booking BEFORE the update so we have from_status and company_id.
   const existing = await getBookingById(bookingId);
 
-  const { data, error } = await supabaseAdmin
+  // ── Step 1: bare UPDATE, no FK joins in RETURNING ─────────────────────────
+  // Keeping the RETURNING clause simple avoids PostgREST join errors on UPDATE.
+  const { error: updateError } = await supabaseAdmin
     .from('bookings')
     .update({ status, updated_at: new Date().toISOString() })
-    .eq('id', bookingId)
-    .select(`
-      *,
-      package:packages!bookings_package_id_fkey(title, duration_days, location:locations(city, state)),
-      company:companies!bookings_company_id_fkey(name, logo_url)
-    `)
-    .single();
+    .eq('id', bookingId);
 
-  if (error !== null) throwDb('updateBookingStatus', error);
-  if (data === null) throw new AppError('Booking not found', 404);
+  if (updateError !== null) throwDb('updateBookingStatus.update', updateError);
 
-  // Record status event — actual schema uses from_status/to_status/reason and
-  // requires company_id (NOT NULL FK to companies).
+  // ── Step 2: record the status transition event (non-fatal) ────────────────
   const { error: evtErr } = await supabaseAdmin.from('booking_status_events').insert({
     booking_id: bookingId,
     company_id: existing.company_id,
@@ -952,13 +947,12 @@ export async function updateBookingStatus(
     changed_by: changedBy,
     reason: note ?? null,
   });
-  if (evtErr !== null) logger.error({ err: evtErr, bookingId }, 'Failed to record booking status event');
+  if (evtErr !== null) {
+    logger.error({ err: evtErr, bookingId }, 'Failed to record booking status event');
+  }
 
-  const record = toRecord(data);
-  const userId = readString(record, 'user_id');
-  const userMap = await fetchUserMap(userId ? [userId] : []);
-
-  return mapAdminBooking({ ...record, user: userMap.get(userId) });
+  // ── Step 3: re-fetch with full joins now that the write has settled ────────
+  return getBookingById(bookingId);
 }
 
 // ── Review moderation ─────────────────────────────────────────────────────────
