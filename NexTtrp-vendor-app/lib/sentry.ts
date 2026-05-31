@@ -1,11 +1,8 @@
 /**
- * Optional Sentry — safe without native plugin.
+ * Sentry stub — no-op until a DSN is configured and the package installed.
+ * Set EXPO_PUBLIC_SENTRY_DSN in eas.json to activate real monitoring.
  */
 export function initialiseSentry(): void {
-  const dsn = process.env.EXPO_PUBLIC_SENTRY_DSN;
-  if (!dsn) return;
-  try {
-    const Sentry = require("@sentry/react-native");
-    Sentry.init({ dsn, tracesSampleRate: 0.2 });
-  } catch {}
+  // Intentionally empty — @sentry/react-native not installed.
+  // Add the package + plugin + DSN to enable.
 }
