@@ -70,10 +70,9 @@ function AppLayout(): React.ReactElement {
     if (isLoading) return;
 
     const isInAuthGroup = rootSegment === '(auth)';
-    // Treat all role app groups as protected shells.
-    // (admin) was removed from this app; admins should use NexTtrp-admin-app.
-    const isInProtectedGroup =
-      rootSegment === '(tabs)' || rootSegment === '(vendor)';
+    // Only (tabs) is a protected group in the traveller app.
+    // Vendors use NexTtrp-vendor-app; admins use NexTtrp-admin-app.
+    const isInProtectedGroup = rootSegment === '(tabs)';
 
     if (user && isInAuthGroup) {
       // Logged in while on an auth screen — send to the main app.
