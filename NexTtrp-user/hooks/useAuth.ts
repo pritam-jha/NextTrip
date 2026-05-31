@@ -378,31 +378,24 @@ export function useSignIn(): UseSignInReturn {
       return data;
     },
     onSuccess: (user) => {
-      // Set user immediately so the auth guard in _layout.tsx fires right away
-      // and routes to the home screen without waiting for the async getSession call.
-      setUser(user);
-      // Upgrade to full session in the background so all authenticated API calls
-      // (wishlist, profile updates, etc.) have a valid Bearer token.
+      // Always set BOTH user and session together so the auth guard only
+      // fires after API calls have a valid Bearer token. Setting user without
+      // session first caused a login loop: guard navigated to home, home made
+      // API calls with no token, backend returned 401, clearUser() fired.
       void supabase.auth.getSession().then(({ data: { session } }) => {
-        if (session) {
-          setSession(user, session);
-        }
+        setSession(user, session ?? null);
+        hydrateWishlist(setWishlist);
       });
-      hydrateWishlist(setWishlist);
     },
   });
 
   const googleMutation = useMutation<User, Error, void>({
     mutationFn: runGoogleOAuth,
     onSuccess: (user) => {
-      // Set user immediately so the auth guard navigates without delay.
-      setUser(user);
       void supabase.auth.getSession().then(({ data: { session } }) => {
-        if (session) {
-          setSession(user, session);
-        }
+        setSession(user, session ?? null);
+        hydrateWishlist(setWishlist);
       });
-      hydrateWishlist(setWishlist);
     },
   });
 

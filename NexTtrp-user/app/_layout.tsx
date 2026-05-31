@@ -122,30 +122,10 @@ function AppLayout(): React.ReactElement {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_IN' && session) {
-        // Defer so the Supabase auth callback can finish before we query.
-        setTimeout(() => {
-          void getProfile().then(async ({ data: profile }) => {
-            if (profile) {
-              // Always fetch the current session after profile load —
-              // Supabase may have refreshed the token between SIGNED_IN
-              // and now. Using a stale token causes 401s on the first
-              // authenticated API call, which triggers clearUser() and
-              // sends the user back to the login screen.
-              const { data: { session: latestSession } } =
-                await supabase.auth.getSession();
-              setSession(profile, latestSession ?? session);
-              void getWishlistIds().then(({ data: ids }) => {
-                if (ids) setWishlist(ids);
-              });
-            }
-          });
-        }, 0);
-      } else if (event === 'TOKEN_REFRESHED' && session) {
-        // Silent token rotation — update session but ONLY if the user
-        // profile has already been loaded. If called while the profile
-        // fetch is still in-flight (user is null), updating with null
-        // would wipe the store and send the user back to login.
+      if (event === 'TOKEN_REFRESHED' && session) {
+        // Silently rotate the stored access token. Only update if the
+        // user profile is already loaded — otherwise the login flow's
+        // useSignIn.onSuccess handler owns the initial session setup.
         const currentUser = useAuthStore.getState().user;
         if (currentUser !== null) {
           setSession(currentUser, session);
@@ -155,6 +135,10 @@ function AppLayout(): React.ReactElement {
         setWishlist([]);
         queryClient.clear();
       }
+      // SIGNED_IN is handled by useSignIn.onSuccess / useSignUp.onSuccess
+      // in hooks/useAuth.ts. Duplicating it here caused a race: two concurrent
+      // setSession calls with different token snapshots sent the user to home
+      // then immediately back to login when the staler token got a 401.
     });
 
     return () => {
