@@ -123,12 +123,18 @@ function AppLayout(): React.ReactElement {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_IN' && session) {
-        // Supabase auth callbacks run synchronously; defer Supabase queries
-        // until this callback finishes so sign-in can resolve normally.
+        // Defer so the Supabase auth callback can finish before we query.
         setTimeout(() => {
-          void getProfile().then(({ data: profile }) => {
+          void getProfile().then(async ({ data: profile }) => {
             if (profile) {
-              setSession(profile, session);
+              // Always fetch the current session after profile load —
+              // Supabase may have refreshed the token between SIGNED_IN
+              // and now. Using a stale token causes 401s on the first
+              // authenticated API call, which triggers clearUser() and
+              // sends the user back to the login screen.
+              const { data: { session: latestSession } } =
+                await supabase.auth.getSession();
+              setSession(profile, latestSession ?? session);
               void getWishlistIds().then(({ data: ids }) => {
                 if (ids) setWishlist(ids);
               });
@@ -136,11 +142,15 @@ function AppLayout(): React.ReactElement {
           });
         }, 0);
       } else if (event === 'TOKEN_REFRESHED' && session) {
-        // Silent token rotation — update the stored tokens without re-fetching profile.
-        // (profile data hasn't changed; only the access/refresh tokens rotated)
-        setSession(useAuthStore.getState().user, session);
-      } else if (event === 'SIGNED_OUT' || (event === 'TOKEN_REFRESHED' && !session)) {
-        // Covers both explicit sign-out and expired/invalid refresh token scenarios.
+        // Silent token rotation — update session but ONLY if the user
+        // profile has already been loaded. If called while the profile
+        // fetch is still in-flight (user is null), updating with null
+        // would wipe the store and send the user back to login.
+        const currentUser = useAuthStore.getState().user;
+        if (currentUser !== null) {
+          setSession(currentUser, session);
+        }
+      } else if (event === 'SIGNED_OUT') {
         setSession(null, null);
         setWishlist([]);
         queryClient.clear();
