@@ -526,12 +526,42 @@ export default function PackageDetailScreen(): React.ReactElement {
             />
           )}
           {pkg.status === 'active' && (
-            <View style={styles.liveNote}>
-              <Ionicons name="checkmark-circle" size={16} color={Colors.success} />
-              <Text style={styles.liveNoteText}>
-                This package is live on NEXTTRP and accepting bookings.
-              </Text>
-            </View>
+            <>
+              <View style={styles.liveNote}>
+                <Ionicons name="checkmark-circle" size={16} color={Colors.success} />
+                <Text style={styles.liveNoteText}>
+                  This package is live on NEXTTRP and accepting bookings.
+                </Text>
+              </View>
+              {/* Allow vendor to move active package back to draft (hides it from travellers) */}
+              <Button
+                label="Hide Package (Move to Draft)"
+                onPress={() => {
+                  Alert.alert(
+                    'Hide Package',
+                    'This will move the package back to draft and hide it from travellers. Existing bookings are not affected.',
+                    [
+                      { text: 'Cancel', style: 'cancel' },
+                      {
+                        text: 'Hide',
+                        style: 'destructive',
+                        onPress: () => {
+                          void updatePackage.mutateAsync({
+                            packageId: id ?? '',
+                            updates: { status: 'draft' } as Parameters<typeof updatePackage.mutateAsync>[0]['updates'],
+                          }).catch((err) => {
+                            Alert.alert('Failed', err instanceof Error ? err.message : 'Failed to hide package.');
+                          });
+                        },
+                      },
+                    ],
+                  );
+                }}
+                loading={updatePackage.isPending}
+                fullWidth
+                variant="outline"
+              />
+            </>
           )}
           {pkg.status === 'pending' && (
             <View style={styles.pendingNote}>

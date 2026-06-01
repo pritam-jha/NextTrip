@@ -144,46 +144,26 @@ export default function AccountScreen(): React.ReactElement {
         </Pressable>
       </View>
 
-      {/* ── Company card ─────────────────────────────────────────────── */}
-      {company != null && (
+      {/* ── Approval status banner (only shown when NOT yet approved) ── */}
+      {company != null && !company.is_verified && (
         <Pressable
-          style={[styles.companyCard, Shadows.sm]}
-          onPress={() => router.push('/(vendor)/company')}
+          style={[
+            styles.approvalBanner,
+            { backgroundColor: company.status === 'rejected' ? Colors.errorLight : Colors.warningLight },
+          ]}
+          onPress={() => router.push({ pathname: '/(vendor)/company', params: { from: 'account' } })}
         >
-          <View style={styles.companyLeft}>
-            <View style={[styles.companyIcon, { backgroundColor: Colors.primaryLight }]}>
-              <Ionicons name="business" size={22} color={Colors.primary} />
-            </View>
-            <View style={styles.companyInfo}>
-              <Text style={styles.companyName} numberOfLines={1}>{company.name}</Text>
-              <Text style={styles.companyMeta}>
-                {company.total_packages} packages · {company.avg_rating.toFixed(1)} ★
-              </Text>
-            </View>
-          </View>
-          <View style={[
-            styles.companyStatus,
-            {
-              backgroundColor: company.is_verified
-                ? Colors.successLight
-                : company.status === 'rejected'
-                  ? Colors.errorLight
-                  : Colors.warningLight,
-            },
-          ]}>
-            <Text style={[
-              styles.companyStatusText,
-              {
-                color: company.is_verified
-                  ? Colors.success
-                  : company.status === 'rejected'
-                    ? Colors.error
-                    : Colors.warning,
-              },
-            ]}>
-              {company.is_verified ? 'Verified' : company.status === 'rejected' ? 'Rejected' : 'Pending'}
-            </Text>
-          </View>
+          <Ionicons
+            name={company.status === 'rejected' ? 'close-circle-outline' : 'time-outline'}
+            size={18}
+            color={company.status === 'rejected' ? Colors.error : Colors.warning}
+          />
+          <Text style={[styles.approvalText, { color: company.status === 'rejected' ? Colors.error : Colors.warning }]}>
+            {company.status === 'rejected'
+              ? 'Company rejected — tap to view details and resubmit'
+              : 'Company approval pending — tap to check KYC status'}
+          </Text>
+          <Ionicons name="chevron-forward" size={14} color={company.status === 'rejected' ? Colors.error : Colors.warning} />
         </Pressable>
       )}
 
@@ -193,14 +173,14 @@ export default function AccountScreen(): React.ReactElement {
           icon="business-outline"
           label="Company Profile"
           subtitle="Edit details, logo, and documents"
-          onPress={() => router.push('/(vendor)/company')}
+          onPress={() => router.push({ pathname: '/(vendor)/company', params: { from: 'account' } })}
         />
         <View style={styles.separator} />
         <MenuRow
           icon="bar-chart-outline"
           label="Analytics"
           subtitle="Revenue charts and performance"
-          onPress={() => router.push('/(vendor)/analytics')}
+          onPress={() => router.push({ pathname: '/(vendor)/analytics', params: { from: 'account' } })}
           iconColor={Colors.secondary}
           iconBg={Colors.secondaryLight}
         />
@@ -209,7 +189,7 @@ export default function AccountScreen(): React.ReactElement {
           icon="star-outline"
           label="Reviews"
           subtitle="Read feedback from your travelers"
-          onPress={() => router.push('/(vendor)/reviews')}
+          onPress={() => router.push({ pathname: '/(vendor)/reviews', params: { from: 'account' } })}
           iconColor={Colors.star}
           iconBg={Colors.accentLight}
         />
@@ -218,7 +198,7 @@ export default function AccountScreen(): React.ReactElement {
           icon="wallet-outline"
           label="Payouts"
           subtitle="Payout history and bank accounts"
-          onPress={() => router.push('/(vendor)/payouts')}
+          onPress={() => router.push({ pathname: '/(vendor)/payouts', params: { from: 'account' } })}
           iconColor={Colors.success}
           iconBg={Colors.successLight}
         />
@@ -231,7 +211,7 @@ export default function AccountScreen(): React.ReactElement {
           label="Notifications"
           subtitle={unreadCount > 0 ? `${unreadCount} unread` : 'All caught up'}
           badge={unreadCount}
-          onPress={() => router.push('/(vendor)/notifications')}
+          onPress={() => router.push({ pathname: '/(vendor)/notifications', params: { from: 'account' } })}
           iconColor={Colors.secondary}
           iconBg={Colors.secondaryLight}
         />
@@ -346,49 +326,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  companyCard: {
-    backgroundColor: Colors.backgroundWhite,
-    borderRadius: 16,
-    padding: 16,
+  approvalBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    borderWidth: 1,
-    borderColor: Colors.borderLight,
-    marginBottom: 20,
-  },
-  companyLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    flex: 1,
-  },
-  companyIcon: {
-    width: 44,
-    height: 44,
+    gap: 8,
     borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
+    padding: 12,
+    marginBottom: 16,
   },
-  companyInfo: { flex: 1 },
-  companyName: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: Colors.navy,
-  },
-  companyMeta: {
-    fontSize: 12,
-    color: Colors.textSecondary,
-    marginTop: 2,
-  },
-  companyStatus: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  companyStatusText: {
-    fontSize: 11,
-    fontWeight: '700',
+  approvalText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '500',
+    lineHeight: 18,
   },
   section: {
     marginBottom: 20,

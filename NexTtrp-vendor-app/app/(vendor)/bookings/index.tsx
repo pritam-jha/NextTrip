@@ -6,7 +6,7 @@
  * Tapping a booking navigates to the detail screen.
  */
 
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   FlatList,
   Pressable,
@@ -14,7 +14,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -37,7 +37,17 @@ const STATUS_FILTERS: Array<{ label: string; value: BookingStatus | '' }> = [
 export default function BookingsScreen(): React.ReactElement {
   const insets = useSafeAreaInsets();
   const { bookingFilters, setBookingFilters } = useVendorStore();
+  const { status: initialStatus, from } = useLocalSearchParams<{ status?: BookingStatus; from?: string }>();
   const [page] = useState(1);
+
+  // Apply initial status filter from navigation params (e.g. tapping a dashboard metric)
+  useEffect(() => {
+    if (initialStatus) {
+      setBookingFilters({ status: initialStatus });
+    }
+  // Only run on mount
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const { data, isLoading, isFetching, refetch, isError } = useVendorBookings(page);
 
@@ -64,8 +74,13 @@ export default function BookingsScreen(): React.ReactElement {
 
   return (
     <View style={[styles.flex, { paddingTop: insets.top }]}>
-      {/* Header */}
+      {/* Header — shows back button when opened from dashboard quick action */}
       <View style={styles.header}>
+        {from === 'dashboard' && (
+          <Pressable onPress={() => router.navigate('/(vendor)')} hitSlop={8} style={styles.backBtn}>
+            <Ionicons name="arrow-back" size={22} color={Colors.navy} />
+          </Pressable>
+        )}
         <Text style={styles.heading}>Bookings</Text>
         <Text style={styles.count}>{data?.total ?? 0} total</Text>
       </View>
@@ -137,10 +152,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 14,
   },
+  backBtn: {
+    marginRight: 8,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: Colors.backgroundSoft,
+  },
   heading: {
     fontSize: 22,
     fontWeight: '800',
     color: Colors.navy,
+    flex: 1,
   },
   count: {
     fontSize: 13,

@@ -8,7 +8,7 @@
 
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../constants/colors';
 import { Shadows } from '../../constants/shadows';
@@ -28,7 +28,19 @@ export const Header: React.FC<HeaderProps> = ({
   onBack,
   rightAction,
 }) => {
-  const handleBack = onBack ?? (() => router.back());
+  const params = useLocalSearchParams<{ from?: string }>();
+
+  const handleBack = onBack ?? (() => {
+    // If screen was opened from the Account tab, go back to it explicitly
+    // because tab switches don't add to the navigation history stack.
+    if (params.from === 'account') {
+      router.navigate('/(vendor)/account');
+    } else if (params.from === 'dashboard') {
+      router.navigate('/(vendor)');
+    } else {
+      router.back();
+    }
+  });
 
   return (
     <View style={[styles.header, Shadows.sm]}>

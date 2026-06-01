@@ -208,7 +208,8 @@ export default function DashboardScreen(): React.ReactElement {
           icon="cash-outline"
           iconColor={Colors.success}
           iconBg={Colors.successLight}
-          subtitle="All time"
+          subtitle="All time · tap for details"
+          onPress={() => router.push('/(vendor)/analytics')}
         />
         <DashboardMetricCard
           label="This Month"
@@ -217,6 +218,7 @@ export default function DashboardScreen(): React.ReactElement {
           iconColor={Colors.secondary}
           iconBg={Colors.secondaryLight}
           subtitle={new Date().toLocaleString('default', { month: 'long' })}
+          onPress={() => router.push('/(vendor)/payouts')}
         />
       </MetricGrid>
 
@@ -248,6 +250,7 @@ export default function DashboardScreen(): React.ReactElement {
           icon="checkmark-circle-outline"
           iconColor={Colors.success}
           iconBg={Colors.successLight}
+          onPress={() => router.push({ pathname: '/(vendor)/bookings', params: { status: 'confirmed' } })}
         />
         <DashboardMetricCard
           label="Cancelled"
@@ -255,6 +258,7 @@ export default function DashboardScreen(): React.ReactElement {
           icon="close-circle-outline"
           iconColor={Colors.error}
           iconBg={Colors.errorLight}
+          onPress={() => router.push({ pathname: '/(vendor)/bookings', params: { status: 'cancelled' } })}
         />
       </MetricGrid>
 
@@ -306,14 +310,14 @@ export default function DashboardScreen(): React.ReactElement {
         <QuickAction
           icon="add-circle-outline"
           label="New Package"
-          onPress={() => router.push('/(vendor)/packages/new')}
+          onPress={() => router.push({ pathname: '/(vendor)/packages/new', params: { from: 'dashboard' } })}
           color={Colors.primary}
           bg={Colors.primaryLight}
         />
         <QuickAction
           icon="list-outline"
           label="All Bookings"
-          onPress={() => router.push('/(vendor)/bookings')}
+          onPress={() => router.push({ pathname: '/(vendor)/bookings', params: { from: 'dashboard' } })}
           color={Colors.secondary}
           bg={Colors.secondaryLight}
         />

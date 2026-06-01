@@ -25,7 +25,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 import { useCreatePackage } from '../../../hooks/useVendorPackages';
@@ -48,6 +48,16 @@ interface CategoryItem { id: string; name: string; label: string; icon: string }
 export default function NewPackageScreen(): React.ReactElement {
   const createPackage = useCreatePackage();
   const { data: company, isLoading: companyLoading } = useVendorCompany();
+  const { from } = useLocalSearchParams<{ from?: string }>();
+
+  // Smart back: return to where we came from
+  const handleBack = useCallback(() => {
+    if (from === 'dashboard') {
+      router.navigate('/(vendor)');
+    } else {
+      router.back();
+    }
+  }, [from]);
 
   // Form fields
   const [title, setTitle] = useState('');
@@ -78,6 +88,32 @@ export default function NewPackageScreen(): React.ReactElement {
       router.replace('/(vendor)/onboarding');
     }
   }, [company, companyLoading]);
+
+  // Show approval gate if company isn't approved yet
+  if (!companyLoading && company !== null && company.status !== 'approved') {
+    return (
+      <View style={styles.flex}>
+        <Header title="New Package" showBack onBack={handleBack} />
+        <View style={styles.gateContainer}>
+          <Ionicons name="time-outline" size={56} color={Colors.warning} />
+          <Text style={styles.gateTitle}>Approval Required</Text>
+          <Text style={styles.gateBody}>
+            Your company profile must be approved by the NEXTTRP team before you can create packages.
+            {'\n\n'}
+            {company.status === 'rejected'
+              ? 'Your application was rejected. Please update your company details and resubmit.'
+              : 'Your application is currently under review. You will be notified once approved.'}
+          </Text>
+          <Pressable
+            style={styles.gateBtn}
+            onPress={() => router.push({ pathname: '/(vendor)/company', params: { from: from ?? 'packages' } })}
+          >
+            <Text style={styles.gateBtnText}>View Company Profile</Text>
+          </Pressable>
+        </View>
+      </View>
+    );
+  }
 
   // Load locations and categories once on mount
   useEffect(() => {
@@ -170,7 +206,7 @@ export default function NewPackageScreen(): React.ReactElement {
   if (locationsLoading) {
     return (
       <View style={styles.flex}>
-        <Header title="New Package" showBack />
+        <Header title="New Package" showBack onBack={handleBack} />
         <InlineLoader />
       </View>
     );
@@ -181,7 +217,7 @@ export default function NewPackageScreen(): React.ReactElement {
       style={styles.flex}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <Header title="New Package" showBack />
+      <Header title="New Package" showBack onBack={handleBack} />
 
       <ScrollView
         style={styles.scroll}
@@ -368,6 +404,11 @@ export default function NewPackageScreen(): React.ReactElement {
 
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: Colors.background },
+  gateContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32, gap: 16 },
+  gateTitle: { fontSize: 22, fontWeight: '800', color: Colors.navy, textAlign: 'center' },
+  gateBody: { fontSize: 14, color: Colors.textSecondary, textAlign: 'center', lineHeight: 22 },
+  gateBtn: { backgroundColor: Colors.primary, borderRadius: 12, paddingHorizontal: 24, paddingVertical: 14 },
+  gateBtnText: { color: Colors.textWhite, fontWeight: '700', fontSize: 15 },
   scroll: { flex: 1 },
   content: {
     paddingHorizontal: 16,
