@@ -39,41 +39,47 @@ export function usePushNotifications(): void {
 
   useEffect(() => {
     if (!user) return;
-    if (!Device.isDevice) return; // push notifications require a physical device
+    if (!Device.isDevice) return;
 
-    void (async () => {
-      // Request permission
-      const { status: existingStatus } = await Notifications.getPermissionsAsync();
-      let finalStatus = existingStatus;
+    // Delay permission request slightly so it doesn't fire immediately on top
+    // of other system dialogs (e.g. iOS app-tracking transparency).
+    // This also prevents the double-alert that occurs when the permission dialog
+    // is triggered at the same time as the app's first render.
+    const timer = setTimeout(() => {
+      void (async () => {
+        const { status: existingStatus } = await Notifications.getPermissionsAsync();
 
-      if (existingStatus !== 'granted') {
-        const { status } = await Notifications.requestPermissionsAsync();
-        finalStatus = status;
-      }
+        // Never ask again if the user already denied — respect their choice.
+        if (existingStatus === 'denied') return;
 
-      if (finalStatus !== 'granted') return;
+        let finalStatus = existingStatus;
+        if (existingStatus !== 'granted') {
+          const { status } = await Notifications.requestPermissionsAsync();
+          finalStatus = status;
+        }
 
-      // Android: set notification channel
-      if (Platform.OS === 'android') {
-        await Notifications.setNotificationChannelAsync('default', {
-          name: 'NEXTTRP',
-          importance: Notifications.AndroidImportance.MAX,
-          vibrationPattern: [0, 250, 250, 250],
-          lightColor: '#E8631A',
-        });
-      }
+          // Android: ensure notification channel exists
+        if (Platform.OS === 'android') {
+          await Notifications.setNotificationChannelAsync('default', {
+            name: 'NEXTTRP',
+            importance: Notifications.AndroidImportance.MAX,
+            vibrationPattern: [0, 250, 250, 250],
+            lightColor: '#E8631A',
+          });
+        }
 
-      // Get Expo push token
-      const tokenData = await Notifications.getExpoPushTokenAsync();
-      const token = tokenData.data;
+        const tokenData = await Notifications.getExpoPushTokenAsync();
+        const token = tokenData.data;
 
-      // Only register if the token is new
-      const stored = await AsyncStorage.getItem(TOKEN_STORAGE_KEY);
-      if (stored === token) return;
+        const stored = await AsyncStorage.getItem(TOKEN_STORAGE_KEY);
+        if (stored === token) return;
 
-      const platform: 'ios' | 'android' = Platform.OS === 'ios' ? 'ios' : 'android';
-      await registerDeviceToken(token, platform);
-      await AsyncStorage.setItem(TOKEN_STORAGE_KEY, token);
-    })();
+        const platform: 'ios' | 'android' = Platform.OS === 'ios' ? 'ios' : 'android';
+        await registerDeviceToken(token, platform);
+        await AsyncStorage.setItem(TOKEN_STORAGE_KEY, token);
+      })();
+    }, 2000); // 2-second delay prevents dialog clash on first open
+
+    return () => clearTimeout(timer);
   }, [user]);
 }

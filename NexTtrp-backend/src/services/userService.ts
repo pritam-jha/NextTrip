@@ -81,6 +81,21 @@ export const updateProfile = async (userId: string, data: UpdateProfileInput): P
     return getProfile(userId);
   }
 
+  // Reject duplicate phone numbers across accounts
+  if (updates['phone']) {
+    const { data: existing, error: phoneCheckErr } = await supabaseAdmin
+      .from('users')
+      .select('id')
+      .eq('phone', updates['phone'])
+      .neq('id', userId)
+      .maybeSingle();
+
+    if (phoneCheckErr !== null) throwDatabaseError('updateProfile.phoneCheck', phoneCheckErr);
+    if (existing !== null) {
+      throw new AppError('This phone number is already registered to another account.', 409);
+    }
+  }
+
   updates.updated_at = new Date().toISOString();
 
   const { data: updatedUser, error } = await supabaseAdmin

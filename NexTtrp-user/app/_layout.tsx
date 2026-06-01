@@ -157,12 +157,14 @@ function AppLayout(): React.ReactElement {
         <Stack.Screen name="index" />
         <Stack.Screen name="(auth)" />
         <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="reset-password" />
         <Stack.Screen name="package/[id]" />
         <Stack.Screen name="booking" />
         <Stack.Screen name="review" />
         <Stack.Screen name="compare" />
         <Stack.Screen name="notifications" />
         <Stack.Screen name="category/[slug]" />
+        <Stack.Screen name="account" />
       </Stack>
     </>
   );

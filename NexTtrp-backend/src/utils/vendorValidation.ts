@@ -217,7 +217,7 @@ const ItineraryDaySchema = z
   .object({
     id: z.string().uuid().optional(),
     day_number: z.coerce.number().int().min(1),
-    title: trimmedString(2, 200),
+    title: trimmedString(2, 200).describe('Day title must be at least 2 characters'),
     description: optionalTrimmed(1, 2000),
     meals: z.array(z.string().trim().min(1)).default([]),
     accommodation: optionalTrimmed(1, 200),
@@ -287,11 +287,12 @@ export type VendorListBookingsQuery = z.infer<typeof VendorListBookingsQuerySche
 
 /**
  * Validates the body for PATCH /api/v1/vendor/bookings/:id/status.
- * Vendors can only transition to confirmed or cancelled.
+ * pending → confirmed | cancelled
+ * confirmed → completed | cancelled
  */
 export const VendorUpdateBookingStatusSchema = z
   .object({
-    status: z.enum(['confirmed', 'cancelled']),
+    status: z.enum(['confirmed', 'cancelled', 'completed']),
     note: optionalTrimmed(1, 500),
   })
   .strict();

@@ -524,6 +524,24 @@ export async function submitVendorPackage(
   const companyId = await resolveCompanyId(ownerId);
   await assertPackageOwnership(packageId, companyId);
 
+  // ── KYC gate: company must be approved before packages can go live ──────────
+  const { data: companyRow, error: companyErr } = await supabaseAdmin
+    .from('companies')
+    .select('status, is_verified')
+    .eq('id', companyId)
+    .maybeSingle();
+
+  if (companyErr !== null) throwDb('submitVendorPackage.companyCheck', companyErr);
+
+  const companyStatus = readString(toRecord(companyRow), 'status', 'pending');
+  if (companyStatus !== 'approved') {
+    throw new AppError(
+      'Your company profile must be approved by the NEXTTRP team before you can submit packages for review. ' +
+      'Please complete your company KYC and wait for admin approval.',
+      403,
+    );
+  }
+
   // Fetch current state to validate completeness
   const { data: raw, error: fetchErr } = await supabaseAdmin
     .from('packages')
@@ -1099,13 +1117,15 @@ export async function deleteVendorPackage(ownerId: string, packageId: string): P
 }
 
 /**
- * Updates a booking's status (vendor-allowed transitions: confirmed | cancelled).
- * Records the status change in booking_status_events.
+ * Updates a booking's status.
+ * Vendor-allowed transitions:
+ *   pending    → confirmed | cancelled
+ *   confirmed  → completed | cancelled
  */
 export async function updateVendorBookingStatus(
   ownerId: string,
   bookingId: string,
-  status: 'confirmed' | 'cancelled',
+  status: 'confirmed' | 'cancelled' | 'completed',
   note?: string,
 ): Promise<VendorBookingDetail> {
   const companyId = await resolveCompanyId(ownerId);

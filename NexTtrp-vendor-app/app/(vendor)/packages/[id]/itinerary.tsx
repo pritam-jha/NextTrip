@@ -58,6 +58,7 @@ function dayToFormDraft(day: VendorItineraryDay): DayDraft {
 }
 
 const MEAL_OPTIONS = ['Breakfast', 'Lunch', 'Dinner', 'All Meals'];
+const INDIVIDUAL_MEALS = ['Breakfast', 'Lunch', 'Dinner'];
 
 // ── Day card ──────────────────────────────────────────────────────────────────
 
@@ -87,10 +88,23 @@ function DayCard({
   const [activityDraft, setActivityDraft] = useState('');
 
   const toggleMeal = (meal: string): void => {
-    const updated = day.meals.includes(meal)
-      ? day.meals.filter((m) => m !== meal)
-      : [...day.meals, meal];
-    onChange('meals', updated);
+    if (meal === 'All Meals') {
+      if (day.meals.includes('All Meals')) {
+        // Deselect everything
+        onChange('meals', []);
+      } else {
+        // Select all: All Meals + individual meals
+        onChange('meals', ['All Meals', ...INDIVIDUAL_MEALS]);
+      }
+    } else {
+      const withoutAll = day.meals.filter((m) => m !== 'All Meals');
+      const updated = withoutAll.includes(meal)
+        ? withoutAll.filter((m) => m !== meal)
+        : [...withoutAll, meal];
+      // If all three individual meals are now selected, also add "All Meals"
+      const allSelected = INDIVIDUAL_MEALS.every((m) => updated.includes(m));
+      onChange('meals', allSelected ? ['All Meals', ...updated] : updated);
+    }
   };
 
   const handleAddActivity = (): void => {

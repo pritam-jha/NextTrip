@@ -148,6 +148,29 @@ export default function BookingDetailScreen(): React.ReactElement {
   }
 
   const isPending = booking.status === 'pending';
+  const isConfirmed = booking.status === 'confirmed';
+
+  const handleComplete = (): void => {
+    Alert.alert(
+      'Mark as Completed',
+      'Mark this booking as completed? This confirms the trip has taken place.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Mark Completed',
+          onPress: () => {
+            void updateStatus.mutateAsync({
+              bookingId: id ?? '',
+              status: 'completed',
+              note: noteText.trim() || undefined,
+            }).catch((err) => {
+              Alert.alert('Failed', err instanceof Error ? err.message : 'Could not complete booking.');
+            });
+          },
+        },
+      ],
+    );
+  };
 
   return (
     <View style={styles.flex}>
@@ -249,8 +272,8 @@ export default function BookingDetailScreen(): React.ReactElement {
           </View>
         )}
 
-        {/* Actions for pending bookings */}
-        {isPending && (
+        {/* Actions for pending or confirmed bookings */}
+        {(isPending || isConfirmed) && (
           <View style={[styles.section, Shadows.sm]}>
             <Text style={styles.sectionTitle}>Add a Note (Optional)</Text>
             <TextInput
@@ -263,15 +286,28 @@ export default function BookingDetailScreen(): React.ReactElement {
               numberOfLines={3}
             />
             <View style={styles.actionRow}>
-              <View style={styles.actionBtn}>
-                <Button
-                  label="Confirm"
-                  onPress={handleConfirm}
-                  loading={updateStatus.isPending}
-                  fullWidth
-                  variant="success"
-                />
-              </View>
+              {isPending && (
+                <View style={styles.actionBtn}>
+                  <Button
+                    label="Confirm"
+                    onPress={handleConfirm}
+                    loading={updateStatus.isPending}
+                    fullWidth
+                    variant="success"
+                  />
+                </View>
+              )}
+              {isConfirmed && (
+                <View style={styles.actionBtn}>
+                  <Button
+                    label="Mark Completed"
+                    onPress={handleComplete}
+                    loading={updateStatus.isPending}
+                    fullWidth
+                    variant="primary"
+                  />
+                </View>
+              )}
               <View style={styles.actionBtn}>
                 <Button
                   label="Cancel"

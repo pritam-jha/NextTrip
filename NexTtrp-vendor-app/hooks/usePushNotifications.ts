@@ -32,30 +32,36 @@ export function usePushNotifications(): void {
     if (!user || user.role !== VENDOR_ROLE) return;
     if (!Device.isDevice) return;
 
-    void (async () => {
-      const { status: existing } = await Notifications.getPermissionsAsync();
-      let finalStatus = existing;
-      if (existing !== 'granted') {
-        const { status } = await Notifications.requestPermissionsAsync();
-        finalStatus = status;
-      }
-      if (finalStatus !== 'granted') return;
+    const timer = setTimeout(() => {
+      void (async () => {
+        const { status: existing } = await Notifications.getPermissionsAsync();
+        if (existing === 'denied') return;
 
-      if (Platform.OS === 'android') {
-        await Notifications.setNotificationChannelAsync('default', {
-          name: 'NEXTTRP Vendor',
-          importance: Notifications.AndroidImportance.MAX,
-          lightColor: '#E8631A',
-        });
-      }
+        let finalStatus = existing;
+        if (existing !== 'granted') {
+          const { status } = await Notifications.requestPermissionsAsync();
+          finalStatus = status;
+        }
+        if (finalStatus !== 'granted') return;
 
-      const { data: token } = await Notifications.getExpoPushTokenAsync();
-      const stored = await AsyncStorage.getItem(TOKEN_KEY);
-      if (stored === token) return;
+        if (Platform.OS === 'android') {
+          await Notifications.setNotificationChannelAsync('default', {
+            name: 'NEXTTRP Vendor',
+            importance: Notifications.AndroidImportance.MAX,
+            lightColor: '#E8631A',
+          });
+        }
 
-      const platform: 'ios' | 'android' = Platform.OS === 'ios' ? 'ios' : 'android';
-      await apiClient.post('/users/device-token', { token, platform });
-      await AsyncStorage.setItem(TOKEN_KEY, token);
-    })();
+        const { data: token } = await Notifications.getExpoPushTokenAsync();
+        const stored = await AsyncStorage.getItem(TOKEN_KEY);
+        if (stored === token) return;
+
+        const platform: 'ios' | 'android' = Platform.OS === 'ios' ? 'ios' : 'android';
+        await apiClient.post('/users/device-token', { token, platform });
+        await AsyncStorage.setItem(TOKEN_KEY, token);
+      })();
+    }, 2000);
+
+    return () => clearTimeout(timer);
   }, [user]);
 }

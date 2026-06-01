@@ -21,10 +21,10 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
+import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -114,48 +114,65 @@ const fieldStyles = StyleSheet.create({
   error: { color: Colors.error, fontSize: 12, fontWeight: '600', lineHeight: 16, marginTop: 4 },
 });
 
-// ── Date picker modal ─────────────────────────────────────────────────────────
+// ── Calendar date picker ──────────────────────────────────────────────────────
+// Uses the native platform calendar (DateTimePickerAndroid on Android,
+// inline DateTimePicker modal on iOS) instead of a text input.
 
-interface DatePickerModalProps { visible: boolean; currentDate: string; onConfirm: (date: string) => void; onDismiss: () => void; }
+interface DatePickerModalProps {
+  visible: boolean;
+  currentDate: string;
+  onConfirm: (date: string) => void;
+  onDismiss: () => void;
+}
 
 function DatePickerModal({ visible, currentDate, onConfirm, onDismiss }: DatePickerModalProps): React.ReactElement {
-  const [inputValue, setInputValue] = useState(currentDate);
-  const [error, setError] = useState('');
+  const [selected, setSelected] = useState<Date>(
+    currentDate ? new Date(currentDate) : new Date(TOMORROW),
+  );
 
-  const handleConfirm = useCallback(() => {
-    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-    if (!dateRegex.test(inputValue)) { setError('Enter date as YYYY-MM-DD'); return; }
-    const parsed = new Date(inputValue);
-    if (isNaN(parsed.getTime())) { setError('Invalid date'); return; }
-    if (parsed < TOMORROW) { setError('Date must be at least tomorrow'); return; }
-    if (parsed > MAX_DATE) { setError('Date must be within 1 year'); return; }
-    setError('');
-    onConfirm(inputValue);
-  }, [inputValue, onConfirm]);
+  // Android: show system calendar dialog imperatively
+  useEffect(() => {
+    if (!visible || Platform.OS !== 'android') return;
+    DateTimePickerAndroid.open({
+      value: selected,
+      minimumDate: TOMORROW,
+      maximumDate: MAX_DATE,
+      mode: 'date',
+      onChange: (_event, date) => {
+        if (date) {
+          setSelected(date);
+          onConfirm(toISODate(date));
+        } else {
+          onDismiss();
+        }
+      },
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible]);
+
+  // iOS: show inline picker inside a modal sheet
+  if (Platform.OS !== 'ios') return <></>;
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onDismiss}>
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onDismiss}>
       <Pressable style={dpStyles.overlay} onPress={onDismiss}>
-        <Pressable style={dpStyles.modal} onPress={() => {}}>
-          <Text style={dpStyles.title}>Select Travel Date</Text>
-          <Text style={dpStyles.hint}>Format: YYYY-MM-DD (e.g. 2025-12-25)</Text>
-          <TextInput
-            style={[dpStyles.input, error ? dpStyles.inputError : null]}
-            value={inputValue}
-            onChangeText={(v) => { setInputValue(v); setError(''); }}
-            placeholder="YYYY-MM-DD"
-            placeholderTextColor={Colors.textTertiary}
-            keyboardType="numbers-and-punctuation"
-            autoFocus
-            maxLength={10}
-            accessibilityLabel="Travel date input"
+        <Pressable style={dpStyles.sheet} onPress={() => {}}>
+          <View style={dpStyles.sheetHandle} />
+          <Text style={dpStyles.sheetTitle}>Select Travel Date</Text>
+          <DateTimePicker
+            value={selected}
+            mode="date"
+            display="inline"
+            minimumDate={TOMORROW}
+            maximumDate={MAX_DATE}
+            onChange={(_e, date) => { if (date) setSelected(date); }}
+            accentColor={Colors.primary}
           />
-          {error ? <Text style={dpStyles.error}>{error}</Text> : null}
           <View style={dpStyles.buttons}>
-            <TouchableOpacity style={dpStyles.cancelBtn} onPress={onDismiss} accessibilityRole="button">
+            <TouchableOpacity style={dpStyles.cancelBtn} onPress={onDismiss}>
               <Text style={dpStyles.cancelText}>Cancel</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={dpStyles.confirmBtn} onPress={handleConfirm} accessibilityRole="button">
+            <TouchableOpacity style={dpStyles.confirmBtn} onPress={() => onConfirm(toISODate(selected))}>
               <Text style={dpStyles.confirmText}>Confirm</Text>
             </TouchableOpacity>
           </View>
@@ -166,18 +183,15 @@ function DatePickerModal({ visible, currentDate, onConfirm, onDismiss }: DatePic
 }
 
 const dpStyles = StyleSheet.create({
-  overlay: { alignItems: 'center', backgroundColor: Colors.overlay, flex: 1, justifyContent: 'center', padding: 32 },
-  modal: { backgroundColor: Colors.surfacePrimary, borderRadius: 20, padding: 24, width: '100%' },
-  title: { color: Colors.textPrimary, fontSize: 17, fontWeight: '700', lineHeight: 22, marginBottom: 6 },
-  hint: { color: Colors.textSecondary, fontSize: 13, fontWeight: '500', lineHeight: 18, marginBottom: 14 },
-  input: { backgroundColor: Colors.surfacePrimary, borderColor: Colors.surfaceBorder, borderRadius: 12, borderWidth: 1.5, color: Colors.textPrimary, fontSize: 16, fontWeight: '600', height: 48, paddingHorizontal: 14 },
-  inputError: { borderColor: Colors.error },
-  error: { color: Colors.error, fontSize: 12, fontWeight: '600', lineHeight: 16, marginTop: 6 },
-  buttons: { flexDirection: 'row', gap: 10, marginTop: 16 },
-  cancelBtn: { borderColor: Colors.surfaceBorder, borderRadius: 999, borderWidth: 1.5, flex: 1, paddingVertical: 12, alignItems: 'center' },
-  cancelText: { color: Colors.textSecondary, fontSize: 15, fontWeight: '600', lineHeight: 20 },
+  overlay: { backgroundColor: Colors.overlay, flex: 1, justifyContent: 'flex-end' },
+  sheet: { backgroundColor: Colors.surfacePrimary ?? '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingBottom: 32, paddingHorizontal: 20, paddingTop: 12 },
+  sheetHandle: { alignSelf: 'center', backgroundColor: Colors.surfaceBorder ?? '#e0e0e0', borderRadius: 3, height: 4, marginBottom: 12, width: 40 },
+  sheetTitle: { color: Colors.textPrimary, fontSize: 17, fontWeight: '700', marginBottom: 12, textAlign: 'center' },
+  buttons: { flexDirection: 'row', gap: 10, marginTop: 8 },
+  cancelBtn: { borderColor: Colors.surfaceBorder ?? '#e0e0e0', borderRadius: 999, borderWidth: 1.5, flex: 1, paddingVertical: 12, alignItems: 'center' },
+  cancelText: { color: Colors.textSecondary, fontSize: 15, fontWeight: '600' },
   confirmBtn: { backgroundColor: Colors.primary, borderRadius: 999, flex: 1, paddingVertical: 12, alignItems: 'center' },
-  confirmText: { color: Colors.white, fontSize: 15, fontWeight: '700', lineHeight: 20 },
+  confirmText: { color: Colors.white ?? '#fff', fontSize: 15, fontWeight: '700' },
 });
 
 // ── Main screen ───────────────────────────────────────────────────────────────

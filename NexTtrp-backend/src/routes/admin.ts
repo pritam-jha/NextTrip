@@ -162,6 +162,40 @@ adminRouter.get('/users/:id', async (req, res, next) => {
 });
 
 /**
+ * DELETE /api/v1/admin/users/:id
+ * Permanently deletes a user account (admin cannot delete themselves).
+ */
+adminRouter.delete('/users/:id', strictLimiter, async (req, res, next) => {
+  try {
+    const adminUser = req.user;
+    if (!adminUser) return errorResponse(res, 'Unauthorized', 401);
+
+    const { id } = AdminUuidParamSchema.parse(req.params);
+
+    if (id === adminUser.id) {
+      return errorResponse(res, 'You cannot delete your own account', 403);
+    }
+
+    // Reuse the shared deleteAccount service which cascades bookings + auth
+    const { deleteAccount } = await import('../services/userService');
+    await deleteAccount(id);
+
+    void logAdminAction({
+      adminId: adminUser.id,
+      action: 'delete_user',
+      entityType: 'user',
+      entityId: id,
+      metadata: {},
+    });
+
+    return success(res, { deleted: true });
+  } catch (err) {
+    if (err instanceof AppError && err.statusCode === 404) return notFound(res, 'User');
+    return next(err);
+  }
+});
+
+/**
  * PATCH /api/v1/admin/users/:id/role
  * Updates a user's role. Admin cannot downgrade their own account.
  */

@@ -20,6 +20,7 @@ import { AdminUserRolePicker } from '../../../components/admin/AdminUserRolePick
 import { ConfirmActionSheet } from '../../../components/dashboard/ConfirmActionSheet';
 import { useAdminUser, useUpdateUserRole } from '../../../hooks/admin/useAdminUsers';
 import { useAuthStore } from '../../../store/authStore';
+import { deleteAdminUser } from '../../../lib/api/admin';
 import type { UserRole } from '../../../types';
 
 function InfoRow({ label, value }: { label: string; value: string }): React.ReactElement {
@@ -72,6 +73,27 @@ export default function AdminUserDetailScreen(): React.ReactElement {
     setPendingRole(null);
   };
 
+  const handleDeleteUser = () => {
+    Alert.alert(
+      'Delete User',
+      `Permanently delete ${user?.full_name ?? 'this user'}? This cancels all their bookings and removes their account. This cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            void deleteAdminUser(userId).then((res) => {
+              if (res.error) { Alert.alert('Error', res.error); return; }
+              Alert.alert('Deleted', 'User account has been removed.');
+              router.back();
+            });
+          },
+        },
+      ],
+    );
+  };
+
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
@@ -104,6 +126,18 @@ export default function AdminUserDetailScreen(): React.ReactElement {
           disabled={isOwnAccount || updateRole.isPending}
           loading={updateRole.isPending}
         />
+
+        {/* Delete user — hidden for admins editing their own account */}
+        {!isOwnAccount && (
+          <TouchableOpacity
+            style={styles.deleteBtn}
+            onPress={handleDeleteUser}
+            activeOpacity={0.82}
+            accessibilityRole="button"
+          >
+            <Text style={styles.deleteBtnText}>🗑 Delete User Account</Text>
+          </TouchableOpacity>
+        )}
       </ScrollView>
 
       <ConfirmActionSheet
@@ -121,6 +155,8 @@ export default function AdminUserDetailScreen(): React.ReactElement {
 }
 
 const styles = StyleSheet.create({
+  deleteBtn: { backgroundColor: Colors.errorLight, borderRadius: 10, marginHorizontal: 16, marginTop: 8, marginBottom: 32, padding: 14, alignItems: 'center' },
+  deleteBtnText: { color: Colors.error, fontSize: 15, fontWeight: '700' },
   safe: { flex: 1, backgroundColor: Colors.background },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.background, gap: 12 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, backgroundColor: Colors.surface, borderBottomWidth: 1, borderBottomColor: Colors.border },

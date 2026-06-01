@@ -59,6 +59,12 @@ export async function updateAdminUserRole(
   return apiClient.patch<AdminUser>(`/admin/users/${encodeURIComponent(userId)}/role`, { role });
 }
 
+export async function deleteAdminUser(
+  userId: string,
+): Promise<BackendApiResponse<{ deleted: boolean }>> {
+  return apiClient.delete<{ deleted: boolean }>(`/admin/users/${encodeURIComponent(userId)}`);
+}
+
 // ── Vendors ───────────────────────────────────────────────────────────────────
 
 export async function getAdminVendors(
