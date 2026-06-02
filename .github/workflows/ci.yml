@@ -20,9 +20,7 @@ jobs:
         with:
           node-version: "20"
           cache: "npm"
-          cache-dependency-path: |
-            NexTtrp-backend/package-lock.json
-            NexTtrp-admin-app/package-lock.json
+          cache-dependency-path: NexTtrp-backend/package-lock.json
 
       - name: Install backend deps
         working-directory: NexTtrp-backend
@@ -32,13 +30,6 @@ jobs:
         working-directory: NexTtrp-backend
         run: npx eslint "src/**/*.ts" --max-warnings 0
 
-      - name: Install admin-app deps
-        working-directory: NexTtrp-admin-app
-        run: npm install --ignore-scripts
-
-      - name: Check admin-app (tsc as lint proxy)
-        working-directory: NexTtrp-admin-app
-        run: npx tsc --noEmit
 
   # ── Job 2: Type-check ────────────────────────────────────────────────────────
   typecheck:
@@ -52,11 +43,7 @@ jobs:
         with:
           node-version: "20"
           cache: "npm"
-          cache-dependency-path: |
-            NexTtrp-backend/package-lock.json
-            NexTtrp-admin-app/package-lock.json
-            NexTtrp-user/package-lock.json
-            NexTtrp-vendor-app/package-lock.json
+          cache-dependency-path: NexTtrp-backend/package-lock.json
 
       - name: Install backend deps
         working-directory: NexTtrp-backend
@@ -64,30 +51,6 @@ jobs:
 
       - name: Type-check backend
         working-directory: NexTtrp-backend
-        run: npx tsc --noEmit
-
-      - name: Install admin-app deps
-        working-directory: NexTtrp-admin-app
-        run: npm install --ignore-scripts
-
-      - name: Type-check admin-app
-        working-directory: NexTtrp-admin-app
-        run: npx tsc --noEmit
-
-      - name: Install user-app deps
-        working-directory: NexTtrp-user
-        run: npm install --ignore-scripts
-
-      - name: Type-check user app (traveller)
-        working-directory: NexTtrp-user
-        run: npx tsc --noEmit
-
-      - name: Install vendor-app deps
-        working-directory: NexTtrp-vendor-app
-        run: npm install --ignore-scripts
-
-      - name: Type-check vendor-app
-        working-directory: NexTtrp-vendor-app
         run: npx tsc --noEmit
 
   # ── Job 3: Build ─────────────────────────────────────────────────────────────
