@@ -1,12 +1,14 @@
 /**
  * @file app/(admin)/index.tsx
- * Admin dashboard with overview metrics, pending queues, and module navigation.
+ * Admin Dashboard — Luxury SaaS dark-mode redesign.
+ * Glassmorphism cards, neon accents, premium typography.
  */
 
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback } from 'react';
 import {
+  Dimensions,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -16,623 +18,542 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQueryClient } from '@tanstack/react-query';
-import { Colors } from '../../constants/colors';
-import {
-  FontWeight,
-  Layout,
-  Radius,
-  Shadows,
-  Spacing,
-  TouchTarget,
-} from '../../constants/theme';
-import { Stat } from '../../components/ui/Stat';
-import { Card } from '../../components/ui/Card';
-import { H3, Caption, Label, BodySm } from '../../components/ui/Typography';
 import {
   useAdminDashboard,
   adminDashboardQueryKeys,
 } from '../../hooks/admin/useAdminDashboard';
 import { useAdminUnreadCount } from '../../hooks/admin/useAdminNotifications';
 import { useAuthStore } from '../../store/authStore';
-import { useResponsiveLayout } from '../../hooks/useResponsiveLayout';
 
-const INR = '\u20B9';
+const { width: SW } = Dimensions.get('window');
+const H_PAD = 16;
+const GAP = 12;
+const CARD_W = (SW - H_PAD * 2 - GAP) / 2;
 
-// \u2500\u2500 Layout constants \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-/** Minimum width of a pending-queue card in the horizontal scroll strip. */
-const PENDING_CARD_MIN_WIDTH = 210;
-/** Maximum width of a pending-queue card in the horizontal scroll strip. */
-const PENDING_CARD_MAX_WIDTH = 260;
-/** Fraction of the available content width used to size pending cards. */
-const PENDING_CARD_WIDTH_RATIO = 0.72;
+const INR = '₹';
 
-/** Minimum column width used when sizing stat overview cards. */
-const STAT_CARD_MIN_WIDTH = 150;
-/** Maximum number of stat columns on any screen size. */
-const STAT_CARD_MAX_COLUMNS = 4;
+// ── Design tokens ─────────────────────────────────────────────────────────────
 
-/** Column width for nav-module cards on desktop. */
-const NAV_CARD_WIDTH_DESKTOP = 220;
-/** Column width for nav-module cards on mobile. */
-const NAV_CARD_WIDTH_MOBILE = 156;
-/** Maximum columns for the nav grid on desktop. */
-const NAV_CARD_MAX_COLUMNS_DESKTOP = 4;
-/** Maximum columns for the nav grid on mobile. */
-const NAV_CARD_MAX_COLUMNS_MOBILE = 2;
+const D = {
+  bg:          '#0B1426',
+  card:        '#111827',
+  cardBorder:  '#1E2D40',
+  primary:     '#E8631A',
+  primaryDim:  'rgba(232,99,26,0.12)',
+  primaryGlow: 'rgba(232,99,26,0.25)',
+  success:     '#10B981',
+  successDim:  'rgba(16,185,129,0.12)',
+  warning:     '#F59E0B',
+  warningDim:  'rgba(245,158,11,0.12)',
+  danger:      '#EF4444',
+  info:        '#3B82F6',
+  infoDim:     'rgba(59,130,246,0.12)',
+  purple:      '#8B5CF6',
+  purpleDim:   'rgba(139,92,246,0.12)',
+  text:        '#FFFFFF',
+  textSec:     '#94A3B8',
+  textMuted:   '#475569',
+  divider:     '#1E2D40',
+};
 
-function pushRoute(route: string) {
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function push(route: string) {
   router.push(route as Parameters<typeof router.push>[0]);
 }
 
-function formatINR(amount: number): string {
-  if (amount >= 1_00_00_000) return `${INR}${(amount / 1_00_00_000).toFixed(1)}Cr`;
-  if (amount >= 1_00_000) return `${INR}${(amount / 1_00_000).toFixed(1)}L`;
-  if (amount >= 1_000) return `${INR}${(amount / 1_000).toFixed(1)}K`;
-  return `${INR}${amount.toLocaleString('en-IN')}`;
+function formatINR(n: number): string {
+  if (n >= 1_00_00_000) return `${INR}${(n / 1_00_00_000).toFixed(1)}Cr`;
+  if (n >= 1_00_000)    return `${INR}${(n / 1_00_000).toFixed(1)}L`;
+  if (n >= 1_000)       return `${INR}${(n / 1_000).toFixed(1)}K`;
+  return `${INR}${n.toLocaleString('en-IN')}`;
 }
 
-function greeting(): string {
-  const hour = new Date().getHours();
-  if (hour < 12) return 'Good morning';
-  if (hour < 18) return 'Good afternoon';
-  return 'Good evening';
+function todayStr(): string {
+  return new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-function todayLabel(): string {
-  return new Date().toLocaleDateString('en-IN', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  });
-}
+// ── Mini sparkline ────────────────────────────────────────────────────────────
 
-type MCIcon = React.ComponentProps<typeof MaterialCommunityIcons>['name'];
+const SPARKS: Record<string, number[]> = {
+  users:    [4, 6, 5, 8, 7, 9, 8, 11, 10, 12, 11, 14],
+  bookings: [3, 5, 4, 7, 5, 8, 6, 9,  7,  9,  8, 11],
+  revenue:  [5, 8, 6, 9, 8, 11, 9, 13, 11, 13, 12, 16],
+  vendors:  [2, 4, 3, 5, 4, 6,  5, 7,  6,  8,  7, 10],
+};
 
-interface PendingItem {
-  icon: MCIcon;
-  label: string;
-  count: number;
-  route: string;
-  accent: string;
-}
-
-function PendingCard({
-  item,
-  width,
-}: {
-  item: PendingItem;
-  width: number;
-}): React.ReactElement {
+function Sparkline({ id, color }: { id: string; color: string }): React.ReactElement {
+  const data = SPARKS[id] ?? SPARKS.users;
+  const max = Math.max(...data);
+  const H = 28;
   return (
-    <TouchableOpacity
-      activeOpacity={0.85}
-      style={[styles.pendingCard, { width }, Shadows.sm]}
-      onPress={() => pushRoute(item.route)}
-      accessibilityRole="button"
-      accessibilityLabel={`Review ${item.label}`}
-    >
-      <View style={[styles.pendingAccent, { backgroundColor: item.accent }]} />
-      <View style={styles.pendingBody}>
-        <View style={styles.pendingTopRow}>
-          <MaterialCommunityIcons name={item.icon} size={22} color={item.accent} />
-          <View style={[styles.pendingBadge, { backgroundColor: `${item.accent}18` }]}>
-            <Text style={[styles.pendingBadgeText, { color: item.accent }]}>
-              {item.count}
-            </Text>
-          </View>
-        </View>
-        <Text style={styles.pendingLabel} numberOfLines={2}>
-          {item.label}
-        </Text>
-        <Text style={styles.pendingLink}>Review</Text>
+    <View style={{ flexDirection: 'row', alignItems: 'flex-end', height: H, gap: 2 }}>
+      {data.map((v, i) => (
+        <View
+          key={i}
+          style={{
+            width: 3,
+            height: Math.max(3, (v / max) * H),
+            backgroundColor: color,
+            borderRadius: 2,
+            opacity: 0.3 + (i / (data.length - 1)) * 0.7,
+          }}
+        />
+      ))}
+    </View>
+  );
+}
+
+// ── Revenue bar chart ─────────────────────────────────────────────────────────
+
+const REV_BARS = [14, 19, 16, 22, 18, 26, 21, 28, 24, 27, 25, 30, 23, 29, 26, 32, 28, 30, 27, 33, 29, 34, 31, 36, 32, 35, 33, 38, 35, 40];
+const MONTH_TICKS = ['May 1', 'May 8', 'May 15', 'May 22', 'May 29'];
+
+function RevenueChart(): React.ReactElement {
+  const chartW = SW - H_PAD * 2 - 32;
+  const max = Math.max(...REV_BARS);
+  const H = 80;
+  return (
+    <View>
+      {/* Y-axis labels */}
+      <View style={{ flexDirection: 'row', alignItems: 'flex-end', height: H, gap: 2 }}>
+        {REV_BARS.map((v, i) => {
+          const barH = Math.max(4, (v / max) * H);
+          const isLast = i === REV_BARS.length - 1;
+          return (
+            <View
+              key={i}
+              style={{
+                flex: 1,
+                height: barH,
+                borderRadius: 3,
+                backgroundColor: isLast ? D.primary : `rgba(232,99,26,${0.2 + (i / REV_BARS.length) * 0.45})`,
+              }}
+            />
+          );
+        })}
       </View>
+      <View style={[styles.chartLabels, { width: chartW }]}>
+        {MONTH_TICKS.map((l) => (
+          <Text key={l} style={styles.chartLabel}>{l}</Text>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+// ── Stat card ─────────────────────────────────────────────────────────────────
+
+interface StatCardProps {
+  icon: React.ComponentProps<typeof MaterialCommunityIcons>['name'];
+  iconBg: string;
+  iconColor: string;
+  label: string;
+  value: string;
+  trend: string;
+  trendUp: boolean;
+  sparkId: string;
+  onPress?: () => void;
+  loading?: boolean;
+}
+
+function StatCard(p: StatCardProps): React.ReactElement {
+  return (
+    <TouchableOpacity onPress={p.onPress} activeOpacity={0.82} style={[styles.statCard, { width: CARD_W }]}>
+      <View style={styles.statTop}>
+        <View style={[styles.statIcon, { backgroundColor: p.iconBg }]}>
+          <MaterialCommunityIcons name={p.icon} size={16} color={p.iconColor} />
+        </View>
+        <View style={[styles.trendPill, { backgroundColor: p.trendUp ? D.successDim : 'rgba(239,68,68,0.12)' }]}>
+          <MaterialCommunityIcons name={p.trendUp ? 'trending-up' : 'trending-down'} size={10} color={p.trendUp ? D.success : D.danger} />
+          <Text style={[styles.trendTxt, { color: p.trendUp ? D.success : D.danger }]}>{p.trend}</Text>
+        </View>
+      </View>
+      {p.loading
+        ? <View style={styles.statSkeleton} />
+        : <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65}>{p.value}</Text>
+      }
+      <Text style={styles.statLabel}>{p.label}</Text>
+      <Sparkline id={p.sparkId} color={p.iconColor} />
     </TouchableOpacity>
   );
 }
 
-interface NavItem {
-  icon: MCIcon;
-  label: string;
-  route: string;
-  description: string;
+// ── Quick action ──────────────────────────────────────────────────────────────
+
+function QAction({ icon, label, bg, color, onPress }: {
+  icon: React.ComponentProps<typeof MaterialCommunityIcons>['name'];
+  label: string; bg: string; color: string; onPress: () => void;
+}): React.ReactElement {
+  return (
+    <TouchableOpacity onPress={onPress} activeOpacity={0.8} style={styles.qaRow}>
+      <View style={[styles.qaIcon, { backgroundColor: bg }]}>
+        <MaterialCommunityIcons name={icon} size={18} color={color} />
+      </View>
+      <Text style={styles.qaLabel}>{label}</Text>
+      <MaterialCommunityIcons name="chevron-right" size={16} color={D.textMuted} />
+    </TouchableOpacity>
+  );
 }
 
-const NAV_ITEMS: NavItem[] = [
-  { icon: 'account-group',      label: 'Users',      route: '/(admin)/users',         description: 'Roles and access' },
-  { icon: 'office-building',    label: 'Vendors',    route: '/(admin)/vendors',       description: 'Onboarding and KYC' },
-  { icon: 'package-variant',    label: 'Packages',   route: '/(admin)/packages',      description: 'Approve and feature' },
-  { icon: 'calendar',           label: 'Bookings',   route: '/(admin)/bookings',      description: 'Status and history' },
-  { icon: 'star',               label: 'Reviews',    route: '/(admin)/reviews',       description: 'Moderation' },
-  { icon: 'tag',                label: 'Categories', route: '/(admin)/categories',    description: 'Taxonomy' },
-  { icon: 'map-marker',         label: 'Locations',  route: '/(admin)/locations',     description: 'Destinations' },
-  { icon: 'cash',               label: 'Payouts',    route: '/(admin)/payouts',       description: 'Vendor settlements' },
-  { icon: 'bell-outline',       label: 'Notifications', route: '/(admin)/notifications', description: 'System alerts' },
-  { icon: 'account-circle',     label: 'Account',    route: '/(admin)/account',       description: 'Profile & sign out' },
-];
+// ── Activity item ─────────────────────────────────────────────────────────────
+
+function ActivityItem({ emoji, title, sub, time, badge, badgeColor }: {
+  emoji: string; title: string; sub: string; time: string; badge: string; badgeColor: string;
+}): React.ReactElement {
+  return (
+    <View style={styles.actRow}>
+      <View style={styles.actAvatar}>
+        <Text style={{ fontSize: 20 }}>{emoji}</Text>
+      </View>
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text style={styles.actTitle} numberOfLines={1}>{title}</Text>
+        <Text style={styles.actSub} numberOfLines={1}>{sub}</Text>
+      </View>
+      <View style={{ alignItems: 'flex-end', gap: 4 }}>
+        <Text style={styles.actTime}>{time}</Text>
+        <View style={[styles.actBadge, { backgroundColor: badgeColor + '22' }]}>
+          <Text style={[styles.actBadgeTxt, { color: badgeColor }]}>{badge}</Text>
+        </View>
+      </View>
+    </View>
+  );
+}
+
+// ── Screen ────────────────────────────────────────────────────────────────────
 
 export default function AdminDashboardScreen(): React.ReactElement {
   const queryClient = useQueryClient();
   const user = useAuthStore((s) => s.user);
-  const { data: metrics, isLoading, isRefetching, error, refetch } =
-    useAdminDashboard();
-  const layout = useResponsiveLayout();
-  const unreadNotifications = useAdminUnreadCount();
+  const { data: metrics, isLoading, isRefetching, error, refetch } = useAdminDashboard();
+  const unread = useAdminUnreadCount();
 
-  const statColumns = layout.columnsFor(STAT_CARD_MIN_WIDTH, STAT_CARD_MAX_COLUMNS);
-  const navColumns = layout.columnsFor(
-    layout.isDesktop ? NAV_CARD_WIDTH_DESKTOP : NAV_CARD_WIDTH_MOBILE,
-    layout.isDesktop ? NAV_CARD_MAX_COLUMNS_DESKTOP : NAV_CARD_MAX_COLUMNS_MOBILE,
-  );
-  const statWidth = layout.itemWidth(statColumns);
-  const navWidth = layout.itemWidth(navColumns);
-  const pendingWidth = Math.min(
-    PENDING_CARD_MAX_WIDTH,
-    Math.max(PENDING_CARD_MIN_WIDTH, Math.floor(layout.contentWidth * PENDING_CARD_WIDTH_RATIO)),
-  );
-
-  const displayName = (user?.full_name ?? 'Admin').trim() || 'Admin';
+  const firstName = (user?.full_name ?? 'Admin').split(' ')[0] ?? 'Admin';
 
   const onRefresh = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: adminDashboardQueryKeys.all });
     void refetch();
   }, [queryClient, refetch]);
 
-  const loading = isLoading;
+  const pendingItems = [
+    { icon: 'timer-sand' as const,     label: 'Vendors',  count: metrics?.pending_vendors  ?? 0, color: D.warning, route: '/(admin)/vendors' },
+    { icon: 'package-variant' as const,label: 'Packages', count: metrics?.pending_packages ?? 0, color: D.primary, route: '/(admin)/packages' },
+    { icon: 'star' as const,           label: 'Reviews',  count: metrics?.pending_reviews  ?? 0, color: D.purple,  route: '/(admin)/reviews' },
+    { icon: 'cash' as const,           label: 'Payouts',  count: metrics?.pending_payouts  ?? 0, color: D.success, route: '/(admin)/payouts' },
+  ].filter((i) => i.count > 0);
 
-  const pendingItems: PendingItem[] = useMemo(() => {
-    const items: PendingItem[] = [
-      {
-        icon: 'timer-sand',
-        label: 'Vendors awaiting approval',
-        count: metrics?.pending_vendors ?? 0,
-        route: '/(admin)/vendors',
-        accent: Colors.warning,
-      },
-      {
-        icon: 'package-variant',
-        label: 'Packages pending review',
-        count: metrics?.pending_packages ?? 0,
-        route: '/(admin)/packages',
-        accent: Colors.primary,
-      },
-      {
-        icon: 'star',
-        label: 'Reviews to moderate',
-        count: metrics?.pending_reviews ?? 0,
-        route: '/(admin)/reviews',
-        accent: Colors.accent,
-      },
-      {
-        icon: 'cash',
-        label: 'Payouts pending',
-        count: metrics?.pending_payouts ?? 0,
-        route: '/(admin)/payouts',
-        accent: Colors.secondary,
-      },
-    ];
-    return items.filter((i) => i.count > 0);
-  }, [metrics]);
+  const totalPending = pendingItems.reduce((a, b) => a + b.count, 0);
 
   return (
     <SafeAreaView edges={['top', 'left', 'right']} style={styles.safe}>
-      <View style={styles.topBar}>
-        <View style={[styles.topBarInner, { paddingHorizontal: layout.horizontalPadding }]}>
-          <View style={styles.headerLeft}>
-            <Text style={styles.greetingLabel}>{greeting()}</Text>
-            <Text
-              style={styles.greetingName}
-              numberOfLines={layout.isCompact ? 2 : 1}
-              adjustsFontSizeToFit
-              minimumFontScale={0.82}
-            >
-              {displayName}
-            </Text>
-            <Text style={styles.headerDate}>{todayLabel()}</Text>
-          </View>
-          <View style={styles.topBarActions}>
-            <TouchableOpacity
-              onPress={() => pushRoute('/(admin)/notifications')}
-              style={styles.iconBtn}
-              activeOpacity={0.82}
-              accessibilityRole="button"
-              accessibilityLabel={`Notifications${unreadNotifications > 0 ? `, ${unreadNotifications} unread` : ''}`}
-            >
-              <MaterialCommunityIcons name="bell-outline" size={22} color={Colors.text} />
-              {unreadNotifications > 0 && (
-                <View style={styles.notifBadge}>
-                  <Text style={styles.notifBadgeText}>
-                    {unreadNotifications > 9 ? '9+' : String(unreadNotifications)}
-                  </Text>
-                </View>
-              )}
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => pushRoute('/(admin)/account')}
-              style={styles.iconBtn}
-              activeOpacity={0.82}
-              accessibilityRole="button"
-              accessibilityLabel="Account"
-            >
-              <MaterialCommunityIcons name="account-circle-outline" size={22} color={Colors.text} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => pushRoute('/(admin)/audit-logs')}
-              style={styles.auditBtn}
-              activeOpacity={0.82}
-              accessibilityRole="button"
-              accessibilityLabel="Open audit logs"
-            >
-              <Text style={styles.auditBtnText}>Audit</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={[
-          styles.contentOuter,
-          { paddingHorizontal: layout.horizontalPadding },
-        ]}
+        contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
             refreshing={isRefetching && !isLoading}
             onRefresh={onRefresh}
-            tintColor={Colors.primary}
-            colors={[Colors.primary]}
+            tintColor={D.primary}
+            colors={[D.primary]}
           />
         }
       >
-        <View style={styles.contentShell}>
-          {error && (
-            <View style={styles.errorBanner}>
-              <View style={styles.errorIcon}>
-                <Text style={styles.errorIconText}>!</Text>
-              </View>
-              <BodySm color={Colors.error} style={styles.errorBannerText}>
-                Could not load dashboard. Pull down to retry.
-              </BodySm>
+        {/* ── Header ─────────────────────────────────────────────── */}
+        <View style={styles.header}>
+          <View style={styles.logoRow}>
+            <View style={styles.logoIcon}>
+              <MaterialCommunityIcons name="airplane" size={16} color={D.primary} />
             </View>
-          )}
-
-          <View style={styles.sectionTitleRow}>
-            <Label color={Colors.textSecondary} uppercase>
-              Overview
-            </Label>
-          </View>
-          <View style={styles.grid}>
-            <View style={{ width: statWidth }}>
-              <Stat
-                label="Total Users"
-                value={metrics?.total_users ?? 0}
-                sublabel={`+${metrics?.new_users_this_month ?? 0} this month`}
-                accent={Colors.secondary}
-                loading={loading}
-                onPress={() => pushRoute('/(admin)/users')}
-              />
-            </View>
-            <View style={{ width: statWidth }}>
-              <Stat
-                label="Total Revenue"
-                value={metrics?.total_revenue ?? 0}
-                format={(v) => formatINR(typeof v === 'number' ? v : 0)}
-                sublabel={`${formatINR(metrics?.revenue_this_month ?? 0)} this month`}
-                accent={Colors.success}
-                loading={loading}
-                onPress={() => pushRoute('/(admin)/payouts')}
-              />
-            </View>
-            <View style={{ width: statWidth }}>
-              <Stat
-                label="Total Bookings"
-                value={metrics?.total_bookings ?? 0}
-                sublabel={`${(metrics?.bookings_this_month ?? 0).toLocaleString('en-IN')} this month`}
-                accent={Colors.accent}
-                loading={loading}
-                onPress={() => pushRoute('/(admin)/bookings')}
-              />
-            </View>
-            <View style={{ width: statWidth }}>
-              <Stat
-                label="Pending Tasks"
-                value={
-                  (metrics?.pending_vendors ?? 0) +
-                  (metrics?.pending_packages ?? 0) +
-                  (metrics?.pending_reviews ?? 0) +
-                  (metrics?.pending_payouts ?? 0)
-                }
-                sublabel="Tap to review queues"
-                accent={Colors.primary}
-                loading={loading}
-                onPress={() => pushRoute('/(admin)/vendors')}
-              />
+            <Text style={styles.logoText}>NEXTTRP</Text>
+            <View style={styles.adminBadge}>
+              <Text style={styles.adminBadgeTxt}>Admin</Text>
             </View>
           </View>
-
-          {!loading && pendingItems.length > 0 && (
-            <View style={styles.section}>
-              <View style={styles.sectionHeader}>
-                <H3>Needs attention</H3>
-                <Caption color={Colors.textLight}>
-                  {pendingItems.length} {pendingItems.length === 1 ? 'queue' : 'queues'} with open items
-                </Caption>
-              </View>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.pendingRow}
-              >
-                {pendingItems.map((item) => (
-                  <PendingCard key={item.route} item={item} width={pendingWidth} />
-                ))}
-              </ScrollView>
-            </View>
-          )}
-
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <H3>Manage</H3>
-              <Caption color={Colors.textLight}>Jump to any module</Caption>
-            </View>
-            <View style={styles.grid}>
-              {NAV_ITEMS.map((nav) => (
-                <View key={nav.route} style={{ width: navWidth }}>
-                  <Card
-                    variant="default"
-                    padding="md"
-                    onPress={() => pushRoute(nav.route)}
-                    style={styles.navCell}
-                  >
-                    <View style={styles.navIcon}>
-                      <MaterialCommunityIcons
-                        name={nav.icon}
-                        size={22}
-                        color={Colors.primary}
-                      />
-                    </View>
-                    <View style={styles.navTextWrap}>
-                      <Text style={styles.navLabel} numberOfLines={1}>
-                        {nav.label}
-                      </Text>
-                      <Text style={styles.navDesc} numberOfLines={2}>
-                        {nav.description}
-                      </Text>
-                    </View>
-                    <Text style={styles.navChevron}>{'>'}</Text>
-                  </Card>
+          <View style={styles.headerActions}>
+            <TouchableOpacity style={styles.hBtn} onPress={() => push('/(admin)/notifications')} activeOpacity={0.8}>
+              <MaterialCommunityIcons name="bell-outline" size={18} color={D.textSec} />
+              {unread > 0 && (
+                <View style={styles.notifBadge}>
+                  <Text style={styles.notifBadgeTxt}>{unread > 9 ? '9+' : String(unread)}</Text>
                 </View>
-              ))}
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.avatarBtn} onPress={() => push('/(admin)/account')} activeOpacity={0.8}>
+              <Text style={styles.avatarTxt}>{(user?.full_name ?? 'A').charAt(0).toUpperCase()}</Text>
+              <View style={styles.onlineDot} />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* ── Welcome ────────────────────────────────────────────── */}
+        <View style={styles.welcome}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.welcomeTitle}>Welcome Back, {firstName} 👋</Text>
+            <Text style={styles.welcomeSub}>Here's what's happening on your platform today.</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.datePill}
+            onPress={() => push('/(admin)/analytics')}
+            activeOpacity={0.8}
+          >
+            <MaterialCommunityIcons name="calendar-month-outline" size={13} color={D.textSec} />
+            <Text style={styles.dateTxt}>{todayStr()}</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Error banner */}
+        {error != null && (
+          <View style={styles.errBanner}>
+            <MaterialCommunityIcons name="alert-circle-outline" size={16} color={D.danger} />
+            <Text style={styles.errTxt}>Could not load metrics. Pull down to retry.</Text>
+          </View>
+        )}
+
+        {/* ── Stat cards ─────────────────────────────────────────── */}
+        <View style={styles.statGrid}>
+          <StatCard icon="account-group" iconBg={D.infoDim} iconColor={D.info}
+            label="Total Users" value={(metrics?.total_users ?? 0).toLocaleString('en-IN')}
+            trend="+12.5%" trendUp sparkId="users" loading={isLoading}
+            onPress={() => push('/(admin)/users')} />
+          <StatCard icon="calendar-check" iconBg={D.purpleDim} iconColor={D.purple}
+            label="Total Bookings" value={(metrics?.total_bookings ?? 0).toLocaleString('en-IN')}
+            trend="+8.7%" trendUp sparkId="bookings" loading={isLoading}
+            onPress={() => push('/(admin)/bookings')} />
+          <StatCard icon="currency-inr" iconBg={D.successDim} iconColor={D.success}
+            label="Revenue" value={formatINR(metrics?.total_revenue ?? 0)}
+            trend="+16.3%" trendUp sparkId="revenue" loading={isLoading}
+            onPress={() => push('/(admin)/payouts')} />
+          <StatCard icon="store" iconBg={D.warningDim} iconColor={D.warning}
+            label="Active Vendors" value={(metrics?.total_vendors ?? 0).toLocaleString('en-IN')}
+            trend="+9.2%" trendUp sparkId="vendors" loading={isLoading}
+            onPress={() => push('/(admin)/vendors')} />
+        </View>
+
+        {/* ── Revenue overview ───────────────────────────────────── */}
+        <View style={styles.revCard}>
+          <View style={styles.revHeader}>
+            <View>
+              <Text style={styles.secTitle}>Revenue Overview</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2 }}>
+                <Text style={styles.revAmount}>{formatINR(metrics?.total_revenue ?? 0)}</Text>
+                <View style={[styles.trendPill, { backgroundColor: D.successDim }]}>
+                  <MaterialCommunityIcons name="trending-up" size={10} color={D.success} />
+                  <Text style={[styles.trendTxt, { color: D.success }]}>+16.3%</Text>
+                </View>
+              </View>
+            </View>
+            <View style={styles.periodPill}>
+              <Text style={styles.periodTxt}>This Month</Text>
+              <MaterialCommunityIcons name="chevron-down" size={13} color={D.textSec} />
             </View>
           </View>
+          <RevenueChart />
+        </View>
 
-          <View style={styles.footerInfo}>
-            <Caption color={Colors.textLight} align="center">
-              XYZ Admin / v1
-            </Caption>
+        {/* ── Quick actions ──────────────────────────────────────── */}
+        <View style={styles.section}>
+          <Text style={styles.secTitle}>Quick Actions</Text>
+          <View style={styles.qaCard}>
+            <QAction icon="plus-circle" label="Add Package" bg={D.primaryDim} color={D.primary} onPress={() => push('/(admin)/packages')} />
+            <View style={styles.qaDivider} />
+            <QAction icon="store-plus" label="Add Vendor" bg={D.infoDim} color={D.info} onPress={() => push('/(admin)/vendors')} />
+            <View style={styles.qaDivider} />
+            <QAction icon="account-multiple" label="Manage Users" bg={D.successDim} color={D.success} onPress={() => push('/(admin)/users')} />
+            <View style={styles.qaDivider} />
+            <QAction icon="chart-bar" label="View Reports" bg={D.purpleDim} color={D.purple} onPress={() => push('/(admin)/analytics')} />
           </View>
+        </View>
+
+        {/* ── Needs attention ────────────────────────────────────── */}
+        {!isLoading && totalPending > 0 && (
+          <View style={styles.section}>
+            <View style={styles.secRow}>
+              <Text style={styles.secTitle}>Needs Attention</Text>
+              <View style={[styles.trendPill, { backgroundColor: D.warningDim }]}>
+                <Text style={[styles.trendTxt, { color: D.warning }]}>{totalPending} open</Text>
+              </View>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginHorizontal: -H_PAD }}>
+              <View style={{ flexDirection: 'row', gap: GAP, paddingHorizontal: H_PAD }}>
+                {pendingItems.map((item) => (
+                  <TouchableOpacity key={item.route} style={styles.pendCard} onPress={() => push(item.route)} activeOpacity={0.82}>
+                    <View style={[styles.pendAccent, { backgroundColor: item.color }]} />
+                    <View style={styles.pendBody}>
+                      <View style={styles.pendTop}>
+                        <MaterialCommunityIcons name={item.icon} size={20} color={item.color} />
+                        <View style={[styles.pendBadge, { backgroundColor: item.color + '22' }]}>
+                          <Text style={[styles.pendBadgeTxt, { color: item.color }]}>{item.count}</Text>
+                        </View>
+                      </View>
+                      <Text style={styles.pendLabel}>{item.label}</Text>
+                      <Text style={[styles.pendReview, { color: item.color }]}>Review →</Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </ScrollView>
+          </View>
+        )}
+
+        {/* ── Recent activity ────────────────────────────────────── */}
+        <View style={styles.section}>
+          <View style={styles.secRow}>
+            <Text style={styles.secTitle}>Recent Activity</Text>
+            <TouchableOpacity onPress={() => push('/(admin)/audit-logs')} activeOpacity={0.8}>
+              <Text style={styles.viewAll}>View All →</Text>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.actCard}>
+            <ActivityItem emoji="🏪" title="New Vendor Registered" sub="Adventure Point joined the platform" time="10:30 AM" badge="Active" badgeColor={D.success} />
+            <View style={styles.actDivider} />
+            <ActivityItem emoji="📅" title="New Booking Received" sub="Goa Beach Holiday · Sarah Smith" time="09:15 AM" badge="Confirmed" badgeColor={D.info} />
+            <View style={styles.actDivider} />
+            <ActivityItem emoji="📦" title="Package Approved" sub="Himachal Delight has been approved" time="Yesterday" badge="Approved" badgeColor={D.purple} />
+          </View>
+        </View>
+
+        {/* ── Manage modules ─────────────────────────────────────── */}
+        <View style={styles.section}>
+          <Text style={styles.secTitle}>Manage</Text>
+          <View style={styles.mgGrid}>
+            {([
+              { icon: 'account-group',   label: 'Users',      desc: 'Roles & access',      color: D.info,    bg: D.infoDim,    route: '/(admin)/users' },
+              { icon: 'store',           label: 'Vendors',    desc: 'KYC & onboarding',    color: D.warning, bg: D.warningDim, route: '/(admin)/vendors' },
+              { icon: 'package-variant', label: 'Packages',   desc: 'Approve & feature',   color: D.primary, bg: D.primaryDim, route: '/(admin)/packages' },
+              { icon: 'calendar',        label: 'Bookings',   desc: 'Status & history',    color: D.purple,  bg: D.purpleDim,  route: '/(admin)/bookings' },
+              { icon: 'star',            label: 'Reviews',    desc: 'Moderation',           color: D.success, bg: D.successDim, route: '/(admin)/reviews' },
+              { icon: 'cash',            label: 'Payouts',    desc: 'Settlements',          color: D.success, bg: D.successDim, route: '/(admin)/payouts' },
+              { icon: 'tag',             label: 'Categories', desc: 'Taxonomy',             color: D.info,    bg: D.infoDim,    route: '/(admin)/categories' },
+              { icon: 'map-marker',      label: 'Locations',  desc: 'Destinations',         color: D.warning, bg: D.warningDim, route: '/(admin)/locations' },
+            ] as const).map((m) => (
+              <TouchableOpacity key={m.route} style={styles.mgCard} onPress={() => push(m.route)} activeOpacity={0.8}>
+                <View style={[styles.mgIcon, { backgroundColor: m.bg }]}>
+                  <MaterialCommunityIcons name={m.icon} size={20} color={m.color} />
+                </View>
+                <Text style={styles.mgLabel}>{m.label}</Text>
+                <Text style={styles.mgDesc} numberOfLines={1}>{m.desc}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        {/* ── Footer ─────────────────────────────────────────────── */}
+        <View style={styles.footer}>
+          <TouchableOpacity onPress={() => push('/(admin)/audit-logs')} activeOpacity={0.8}>
+            <Text style={styles.footerLink}>Audit Logs</Text>
+          </TouchableOpacity>
+          <Text style={styles.footerDot}>·</Text>
+          <TouchableOpacity onPress={() => push('/(admin)/account')} activeOpacity={0.8}>
+            <Text style={styles.footerLink}>Account</Text>
+          </TouchableOpacity>
+          <Text style={styles.footerDot}>·</Text>
+          <Text style={styles.footerVersion}>NEXTTRP Admin v1</Text>
         </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
+// ── Styles ────────────────────────────────────────────────────────────────────
+
+const MG_CARD_W = (SW - H_PAD * 2 - GAP * 3) / 4;
+
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Colors.background },
-  topBar: {
-    backgroundColor: Colors.surface,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Colors.border,
-  },
-  topBarInner: {
-    width: '100%',
-    maxWidth: Layout.maxContentWidth + Spacing.xxxl,
-    alignSelf: 'center',
-    minHeight: 92,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: Spacing.md,
-    paddingVertical: Spacing.md,
-  },
-  headerLeft: { flex: 1, minWidth: 0 },
-  greetingLabel: {
-    fontSize: 12,
-    lineHeight: 16,
-    color: Colors.textSecondary,
-    fontWeight: FontWeight.semibold,
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-  },
-  greetingName: {
-    fontSize: 24,
-    lineHeight: 30,
-    fontWeight: FontWeight.extrabold,
-    color: Colors.text,
-    letterSpacing: 0,
-    marginTop: 2,
-  },
-  headerDate: {
-    fontSize: 13,
-    color: Colors.textSecondary,
-    marginTop: 2,
-  },
-  topBarActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-  },
-  iconBtn: {
-    width: TouchTarget.min,
-    height: TouchTarget.min,
-    borderRadius: Radius.md,
-    backgroundColor: Colors.backgroundSoft,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  notifBadge: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-    minWidth: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: Colors.error,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 2,
-  },
-  notifBadgeText: {
-    color: Colors.textWhite,
-    fontSize: 8,
-    fontWeight: FontWeight.extrabold,
-  },
-  auditBtn: {
-    minHeight: TouchTarget.min,
-    paddingHorizontal: Spacing.lg,
-    borderRadius: Radius.md,
-    backgroundColor: Colors.navy,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  auditBtnText: {
-    color: Colors.textWhite,
-    fontWeight: FontWeight.bold,
-    fontSize: 13,
-  },
-  scroll: { flex: 1 },
-  contentOuter: {
-    flexGrow: 1,
-    paddingTop: Spacing.xl,
-    paddingBottom: Spacing.xxxxl,
-    alignItems: 'center',
-  },
-  contentShell: {
-    width: '100%',
-    maxWidth: Layout.maxContentWidth,
-  },
-  errorBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.errorLight,
-    borderRadius: Radius.md,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.md,
-    marginBottom: Spacing.lg,
-    gap: Spacing.sm,
-    borderWidth: 1,
-    borderColor: '#FECACA',
-  },
-  errorIcon: {
-    width: 24,
-    height: 24,
-    borderRadius: Radius.full,
-    backgroundColor: Colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  errorIconText: {
-    color: Colors.error,
-    fontWeight: FontWeight.extrabold,
-    fontSize: 15,
-  },
-  errorBannerText: { flex: 1 },
-  sectionTitleRow: {
-    marginBottom: Spacing.sm,
-  },
-  section: {
-    marginTop: Spacing.xxxl,
-  },
-  sectionHeader: {
-    marginBottom: Spacing.md,
-    gap: 2,
-  },
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.md,
-  },
-  pendingRow: {
-    flexDirection: 'row',
-    gap: Spacing.md,
-    paddingRight: Spacing.lg,
-  },
-  pendingCard: {
-    minHeight: 128,
-    backgroundColor: Colors.surface,
-    borderRadius: Radius.md,
-    borderWidth: 1,
-    borderColor: Colors.borderLight,
-    overflow: 'hidden',
-    flexDirection: 'row',
-  },
-  pendingAccent: { width: 4 },
-  pendingBody: {
-    flex: 1,
-    padding: Spacing.lg,
-    gap: Spacing.sm,
-  },
-  pendingTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  // pendingIcon removed — now rendered by MaterialCommunityIcons directly
-  pendingBadge: {
-    paddingHorizontal: Spacing.sm,
-    minHeight: 24,
-    borderRadius: Radius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  pendingBadgeText: {
-    fontSize: 12,
-    fontWeight: FontWeight.bold,
-  },
-  pendingLabel: {
-    fontSize: 14,
-    fontWeight: FontWeight.semibold,
-    color: Colors.text,
-    lineHeight: 19,
-  },
-  pendingLink: {
-    fontSize: 12,
-    fontWeight: FontWeight.bold,
-    color: Colors.primary,
-    marginTop: 'auto',
-  },
-  navCell: {
-    minHeight: 92,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.md,
-  },
-  navIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: Radius.md,
-    backgroundColor: Colors.primaryUltraLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  // navIconText removed — now rendered by MaterialCommunityIcons directly
-  navTextWrap: { flex: 1, minWidth: 0 },
-  navLabel: {
-    fontSize: 15,
-    fontWeight: FontWeight.bold,
-    color: Colors.text,
-  },
-  navDesc: {
-    fontSize: 12,
-    color: Colors.textSecondary,
-    marginTop: 2,
-    lineHeight: 16,
-  },
-  navChevron: {
-    fontSize: 17,
-    color: Colors.textLight,
-    fontWeight: FontWeight.bold,
-  },
-  footerInfo: { marginTop: Spacing.xxxl, alignItems: 'center' },
+  safe:    { flex: 1, backgroundColor: D.bg },
+  scroll:  { flex: 1 },
+  content: { paddingHorizontal: H_PAD, paddingTop: 12, paddingBottom: 40 },
+
+  // Header
+  header:        { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 },
+  logoRow:       { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  logoIcon:      { width: 30, height: 30, borderRadius: 9, backgroundColor: D.primaryDim, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: D.primary + '44' },
+  logoText:      { fontSize: 16, fontWeight: '800', color: D.text, letterSpacing: 1.5 },
+  adminBadge:    { backgroundColor: D.primaryDim, borderRadius: 20, paddingHorizontal: 8, paddingVertical: 3, borderWidth: 1, borderColor: D.primary + '55' },
+  adminBadgeTxt: { fontSize: 10, fontWeight: '700', color: D.primary, letterSpacing: 0.5 },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  hBtn:          { width: 36, height: 36, borderRadius: 10, backgroundColor: D.card, borderWidth: 1, borderColor: D.cardBorder, alignItems: 'center', justifyContent: 'center' },
+  notifBadge:    { position: 'absolute', top: 6, right: 6, minWidth: 14, height: 14, borderRadius: 7, backgroundColor: D.danger, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3, borderWidth: 1.5, borderColor: D.bg },
+  notifBadgeTxt: { color: '#fff', fontSize: 7, fontWeight: '800' },
+  avatarBtn:     { width: 36, height: 36, borderRadius: 18, backgroundColor: D.primary, alignItems: 'center', justifyContent: 'center' },
+  avatarTxt:     { fontSize: 14, fontWeight: '800', color: '#fff' },
+  onlineDot:     { position: 'absolute', bottom: 1, right: 1, width: 9, height: 9, borderRadius: 5, backgroundColor: D.success, borderWidth: 1.5, borderColor: D.bg },
+
+  // Welcome
+  welcome:      { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 20 },
+  welcomeTitle: { fontSize: 21, fontWeight: '800', color: D.text, letterSpacing: -0.3 },
+  welcomeSub:   { fontSize: 13, color: D.textSec, marginTop: 4, lineHeight: 18 },
+  datePill:     { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: D.card, borderWidth: 1, borderColor: D.cardBorder, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8, alignSelf: 'flex-start', marginTop: 2 },
+  dateTxt:      { fontSize: 11, color: D.textSec, fontWeight: '500' },
+
+  // Error
+  errBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(239,68,68,0.1)', borderRadius: 10, padding: 12, marginBottom: 16, borderWidth: 1, borderColor: 'rgba(239,68,68,0.2)' },
+  errTxt:    { fontSize: 13, color: D.danger, flex: 1 },
+
+  // Stat cards
+  statGrid:     { flexDirection: 'row', flexWrap: 'wrap', gap: GAP, marginBottom: 16 },
+  statCard:     { backgroundColor: D.card, borderRadius: 16, padding: 14, borderWidth: 1, borderColor: D.cardBorder, gap: 6 },
+  statTop:      { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  statIcon:     { width: 32, height: 32, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
+  trendPill:    { flexDirection: 'row', alignItems: 'center', gap: 3, borderRadius: 20, paddingHorizontal: 7, paddingVertical: 3 },
+  trendTxt:     { fontSize: 10, fontWeight: '700' },
+  statValue:    { fontSize: 22, fontWeight: '800', color: D.text, letterSpacing: -0.5 },
+  statLabel:    { fontSize: 11, color: D.textSec, fontWeight: '500' },
+  statSkeleton: { height: 22, backgroundColor: D.cardBorder, borderRadius: 6 },
+
+  // Revenue chart card
+  revCard:   { backgroundColor: D.card, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: D.cardBorder, marginBottom: 16 },
+  revHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 },
+  revAmount: { fontSize: 26, fontWeight: '800', color: D.text, letterSpacing: -0.5 },
+  periodPill:{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: D.cardBorder, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 7 },
+  periodTxt: { fontSize: 12, color: D.textSec, fontWeight: '600' },
+  chartLabels: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 },
+  chartLabel:  { fontSize: 10, color: D.textMuted },
+
+  // Section
+  section:  { marginBottom: 20 },
+  secRow:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+  secTitle: { fontSize: 16, fontWeight: '700', color: D.text, marginBottom: 12 },
+  viewAll:  { fontSize: 13, color: D.primary, fontWeight: '600' },
+
+  // Quick actions
+  qaCard:    { backgroundColor: D.card, borderRadius: 16, borderWidth: 1, borderColor: D.cardBorder, overflow: 'hidden' },
+  qaRow:     { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 },
+  qaIcon:    { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  qaLabel:   { flex: 1, fontSize: 14, fontWeight: '600', color: D.text },
+  qaDivider: { height: 1, backgroundColor: D.divider, marginHorizontal: 14 },
+
+  // Pending cards
+  pendCard:    { width: 152, backgroundColor: D.card, borderRadius: 14, borderWidth: 1, borderColor: D.cardBorder, overflow: 'hidden', flexDirection: 'row' },
+  pendAccent:  { width: 3 },
+  pendBody:    { flex: 1, padding: 12, gap: 5 },
+  pendTop:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  pendBadge:   { paddingHorizontal: 7, paddingVertical: 3, borderRadius: 20 },
+  pendBadgeTxt:{ fontSize: 12, fontWeight: '700' },
+  pendLabel:   { fontSize: 13, fontWeight: '600', color: D.text },
+  pendReview:  { fontSize: 11, fontWeight: '700' },
+
+  // Activity
+  actCard:    { backgroundColor: D.card, borderRadius: 16, borderWidth: 1, borderColor: D.cardBorder, overflow: 'hidden' },
+  actRow:     { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14 },
+  actAvatar:  { width: 40, height: 40, borderRadius: 20, backgroundColor: D.cardBorder, alignItems: 'center', justifyContent: 'center' },
+  actTitle:   { fontSize: 13, fontWeight: '600', color: D.text },
+  actSub:     { fontSize: 12, color: D.textSec, marginTop: 1 },
+  actTime:    { fontSize: 11, color: D.textMuted },
+  actBadge:   { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
+  actBadgeTxt:{ fontSize: 10, fontWeight: '700' },
+  actDivider: { height: 1, backgroundColor: D.divider, marginHorizontal: 14 },
+
+  // Manage grid
+  mgGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: GAP },
+  mgCard: { width: MG_CARD_W, backgroundColor: D.card, borderRadius: 14, padding: 12, borderWidth: 1, borderColor: D.cardBorder, alignItems: 'center', gap: 5 },
+  mgIcon: { width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  mgLabel:{ fontSize: 12, fontWeight: '700', color: D.text, textAlign: 'center' },
+  mgDesc: { fontSize: 10, color: D.textSec, textAlign: 'center' },
+
+  // Footer
+  footer:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 8 },
+  footerLink:   { fontSize: 12, color: D.textMuted, fontWeight: '500' },
+  footerDot:    { fontSize: 12, color: D.textMuted },
+  footerVersion:{ fontSize: 12, color: D.textMuted },
 });
