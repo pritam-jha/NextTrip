@@ -2,16 +2,18 @@
  * @file routes/bookings.ts
  * @description Booking flow API routes (all protected).
  *
- * POST /api/v1/bookings/create        — Create a pending booking
- * POST /api/v1/bookings/confirm-mock  — Confirm with mock payment
- * GET  /api/v1/bookings               — List user's bookings
- * GET  /api/v1/bookings/:id           — Get single booking detail
+ * POST /api/v1/bookings/create                 — Create a pending booking
+ * POST /api/v1/bookings/create-razorpay-order  — Create Razorpay order (before checkout)
+ * POST /api/v1/bookings/verify-razorpay-payment — Verify payment + confirm booking
+ * POST /api/v1/bookings/confirm-mock           — Mock payment (dev/soft-launch only)
+ * GET  /api/v1/bookings                        — List user's bookings
+ * GET  /api/v1/bookings/:id                    — Get single booking detail
  */
 
 import { Router } from 'express';
 import { z } from 'zod';
 import { requireAuth } from '../middleware/auth';
-import { defaultLimiter } from '../middleware/rateLimiter';
+import { defaultLimiter, strictLimiter } from '../middleware/rateLimiter';
 import {
   cancelBooking,
   confirmMockPayment,
@@ -19,6 +21,7 @@ import {
   getBookingById,
   getMyBookings,
 } from '../services/bookingService';
+import { createRazorpayOrder, verifyRazorpayPayment } from '../services/razorpayService';
 import { success, validationError, error as errorResponse } from '../utils/response';
 import { UuidParamSchema } from '../utils/validation';
 
@@ -193,6 +196,54 @@ bookingsRouter.post('/confirm-mock', async (req, res, next) => {
     return success(res, result);
   } catch (caughtError) {
     return next(caughtError);
+  }
+});
+
+/**
+ * POST /api/v1/bookings/create-razorpay-order
+ * Creates a Razorpay order for a pending booking.
+ * Call this before opening the Razorpay checkout UI.
+ *
+ * Body: { booking_id }
+ * Returns: { order_id, amount, currency, key_id, booking_id }
+ */
+bookingsRouter.post('/create-razorpay-order', strictLimiter, async (req, res, next) => {
+  try {
+    const schema = z.object({ booking_id: z.string().uuid() }).strict();
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) return validationError(res, parsed.error.flatten().fieldErrors);
+
+    const result = await createRazorpayOrder(parsed.data.booking_id, req.user!.id);
+    return success(res, result);
+  } catch (err) {
+    return next(err);
+  }
+});
+
+/**
+ * POST /api/v1/bookings/verify-razorpay-payment
+ * Verifies Razorpay HMAC signature and confirms the booking as paid.
+ * Call this after the Razorpay checkout succeeds.
+ *
+ * Body: { booking_id, razorpay_order_id, razorpay_payment_id, razorpay_signature }
+ * Returns: { booking_id, payment_id, status }
+ */
+bookingsRouter.post('/verify-razorpay-payment', strictLimiter, async (req, res, next) => {
+  try {
+    const schema = z.object({
+      booking_id:          z.string().uuid(),
+      razorpay_order_id:   z.string().min(1),
+      razorpay_payment_id: z.string().min(1),
+      razorpay_signature:  z.string().min(1),
+    }).strict();
+
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) return validationError(res, parsed.error.flatten().fieldErrors);
+
+    const result = await verifyRazorpayPayment({ ...parsed.data, user_id: req.user!.id });
+    return success(res, result);
+  } catch (err) {
+    return next(err);
   }
 });
 

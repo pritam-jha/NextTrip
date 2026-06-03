@@ -20,11 +20,16 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
+import Constants from 'expo-constants';
 import { BookingProgressBar } from '../../components/booking/BookingProgressBar';
 import { useConfirmMockPayment } from '../../hooks/useBooking';
 import { useBookingStore } from '../../store/bookingStore';
+import { useAuthStore } from '../../store/authStore';
+import { createRazorpayOrder, verifyRazorpayPayment } from '../../lib/api/bookings';
 import { Colors } from '../../constants/colors';
 import { formatINR } from '../../utils/currency';
+
+const isExpoGo = Constants.appOwnership === 'expo';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -111,25 +116,98 @@ export default function PaymentScreen(): React.ReactElement {
       ? rawBookingId[0] ?? ''
       : '';
   const form = useBookingStore((s) => s.form);
+  const user = useAuthStore((s) => s.user);
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>('upi');
   const [upiId, setUpiId] = useState('');
-  const { mutate: confirmPayment, isPending } = useConfirmMockPayment();
+  const [isPaying, setIsPaying] = useState(false);
+  const { mutate: confirmMock, isPending: isMockPending } = useConfirmMockPayment();
+
+  const isPending = isPaying || isMockPending;
 
   const amountToPay = form?.paymentType === 'advance'
     ? form.priceCalculation?.advance_amount ?? 0
     : form?.priceCalculation?.total_amount ?? 0;
 
   const handleMockAppPress = useCallback((appName: string) => {
-    Alert.alert('Mock Mode', `${appName} integration is in mock mode. Tap "Pay" to simulate a successful payment.`, [{ text: 'OK' }]);
+    Alert.alert('Demo', `Tap "Pay Now" to process the payment through Razorpay.`, [{ text: 'OK' }]);
   }, []);
 
-  const handlePay = useCallback(() => {
+  const handlePay = useCallback(async () => {
     if (!id || !form) {
       Alert.alert('Error', 'Booking information is missing. Please start over.');
       return;
     }
-    confirmPayment({ booking_id: id, payment_type: form.paymentType });
-  }, [id, form, confirmPayment]);
+
+    // In Expo Go, fall back to mock payment for development testing
+    if (isExpoGo) {
+      Alert.alert(
+        'Dev Mode',
+        'Razorpay requires a development build (EAS APK). Using mock payment for testing.',
+        [{ text: 'Proceed (Mock)', onPress: () => confirmMock({ booking_id: id, payment_type: form.paymentType }) }, { text: 'Cancel', style: 'cancel' }],
+      );
+      return;
+    }
+
+    setIsPaying(true);
+    try {
+      // 1. Create Razorpay order on backend
+      const orderRes = await createRazorpayOrder(id);
+      if (orderRes.error || !orderRes.data) {
+        Alert.alert('Payment Error', orderRes.error ?? 'Could not initiate payment. Please try again.');
+        return;
+      }
+
+      const { order_id, amount, currency, key_id } = orderRes.data;
+
+      // 2. Open Razorpay checkout (dynamic import — not loaded in Expo Go)
+      const RazorpayCheckout = (await import('react-native-razorpay')).default;
+
+      const options = {
+        description:  'NEXTTRP Package Booking',
+        currency,
+        key:          key_id,
+        amount:       String(amount),
+        order_id,
+        name:         'NEXTTRP',
+        prefill: {
+          email:    user?.email ?? '',
+          contact:  user?.phone ?? '',
+          name:     user?.full_name ?? '',
+        },
+        theme: { color: Colors.primary },
+      };
+
+      const paymentData = await RazorpayCheckout.open(options);
+
+      // 3. Verify signature on backend
+      const verifyRes = await verifyRazorpayPayment({
+        booking_id:          id,
+        razorpay_order_id:   paymentData.razorpay_order_id,
+        razorpay_payment_id: paymentData.razorpay_payment_id,
+        razorpay_signature:  paymentData.razorpay_signature,
+      });
+
+      if (verifyRes.error || !verifyRes.data) {
+        Alert.alert('Verification Failed', verifyRes.error ?? 'Payment received but verification failed. Please contact support.');
+        return;
+      }
+
+      // 4. Navigate to confirmation
+      router.replace({ pathname: '/booking/confirmation', params: { bookingId: id } });
+
+    } catch (err: unknown) {
+      // Razorpay checkout dismissed or failed
+      const code = (err as { code?: number })?.code;
+      if (code === 0) {
+        // User cancelled — silent
+        return;
+      }
+      const msg = (err as { description?: string })?.description ?? 'Payment was not completed. Please try again.';
+      Alert.alert('Payment Failed', msg);
+    } finally {
+      setIsPaying(false);
+    }
+  }, [id, form, user, confirmMock]);
 
   if (!form) {
     return (
@@ -223,7 +301,7 @@ export default function PaymentScreen(): React.ReactElement {
 
       {/* Pay button */}
       <View style={styles.stickyBar}>
-        <TouchableOpacity style={[styles.payButton, isPending && styles.payButtonLoading]} onPress={handlePay} disabled={isPending} activeOpacity={0.85} accessibilityRole="button" accessibilityLabel={`Pay ${formatINR(amountToPay)}`}>
+        <TouchableOpacity style={[styles.payButton, isPending && styles.payButtonLoading]} onPress={() => void handlePay()} disabled={isPending} activeOpacity={0.85} accessibilityRole="button" accessibilityLabel={`Pay ${formatINR(amountToPay)}`}>
           {isPending ? (
             <View style={styles.payButtonInner}>
               <ActivityIndicator color={Colors.white} size="small" />

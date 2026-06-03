@@ -29,6 +29,20 @@ export interface ConfirmMockPaymentResult {
   booking: Booking;
 }
 
+export interface RazorpayOrderResult {
+  order_id:   string;
+  amount:     number; // in paise
+  currency:   string;
+  key_id:     string;
+  booking_id: string;
+}
+
+export interface RazorpayVerifyResult {
+  booking_id: string;
+  payment_id: string;
+  status:     string;
+}
+
 export interface CancelBookingResult {
   booking: Booking;
   refund_amount: number;
@@ -69,6 +83,39 @@ export async function confirmMockPayment(
   );
   if (response.error || !response.data) {
     return { data: null, error: response.error ?? 'Payment confirmation failed.' };
+  }
+  return { data: response.data, error: null };
+}
+
+/** Creates a Razorpay order for a pending booking. Call before opening checkout. */
+export async function createRazorpayOrder(
+  bookingId: string,
+): Promise<ApiResponse<RazorpayOrderResult>> {
+  const response = await apiClient.post<RazorpayOrderResult>(
+    '/bookings/create-razorpay-order',
+    { booking_id: bookingId },
+    true,
+  );
+  if (response.error || !response.data) {
+    return { data: null, error: response.error ?? 'Could not initiate payment.' };
+  }
+  return { data: response.data, error: null };
+}
+
+/** Verifies Razorpay signature and confirms the booking as paid. */
+export async function verifyRazorpayPayment(params: {
+  booking_id:          string;
+  razorpay_order_id:   string;
+  razorpay_payment_id: string;
+  razorpay_signature:  string;
+}): Promise<ApiResponse<RazorpayVerifyResult>> {
+  const response = await apiClient.post<RazorpayVerifyResult>(
+    '/bookings/verify-razorpay-payment',
+    params,
+    true,
+  );
+  if (response.error || !response.data) {
+    return { data: null, error: response.error ?? 'Payment verification failed.' };
   }
   return { data: response.data, error: null };
 }
