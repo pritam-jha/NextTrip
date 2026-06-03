@@ -1,100 +1,98 @@
 /**
  * @file constants/colors.ts
- * @description NEXTTRP Vendor Portal brand palette.
- *
- * Uses the same brand system as NexTtrp-user to maintain visual consistency
- * across all applications in the NEXTTRP ecosystem.
+ * NEXTTRP Vendor Portal — luxury dark-mode palette.
+ * Background: #0B1426 · Cards: #111827 · Accent: #E8631A
  */
 
 export const Colors = {
   // ── Primary Brand ──────────────────────────────────────────
-  primary: '#E8631A',
-  primaryDark: '#CC3300',
-  primaryLight: '#FEF0E8',
-  primaryUltraLight: '#FFF8F0',
+  primary:          '#E8631A',
+  primaryDark:      '#C85412',
+  primaryLight:     'rgba(232,99,26,0.15)',
+  primaryUltraLight:'rgba(232,99,26,0.07)',
 
-  // ── Secondary ──────────────────────────────────────────────
-  secondary: '#0099CC',
-  secondaryDark: '#0077AA',
-  secondaryLight: '#E0F4FF',
+  // ── Secondary / blue ───────────────────────────────────────
+  secondary:        '#3B82F6',
+  secondaryDark:    '#2563EB',
+  secondaryLight:   'rgba(59,130,246,0.15)',
 
-  // ── Accent ─────────────────────────────────────────────────
-  accent: '#FFB800',
-  accentDark: '#E0A000',
-  accentLight: '#FEF3C7',
+  // ── Accent / amber ─────────────────────────────────────────
+  accent:           '#F59E0B',
+  accentDark:       '#D97706',
+  accentLight:      'rgba(245,158,11,0.15)',
 
-  // ── Navy ───────────────────────────────────────────────────
-  navy: '#1A1A2E',
-  navyMedium: '#2D2D44',
-  navyLight: '#3D3D5C',
+  // ── Navy (heading / emphasis text in dark mode) ────────────
+  navy:             '#E2E8F0',
+  navyMedium:       '#94A3B8',
+  navyLight:        '#64748B',
 
   // ── Backgrounds ────────────────────────────────────────────
-  background: '#FFF8F0',
-  backgroundWhite: '#FFFFFF',
-  backgroundSoft: '#FFF3E8',
-  surface: '#FFFFFF',
+  background:       '#0B1426',
+  backgroundWhite:  '#111827',
+  backgroundSoft:   '#0D1830',
+  surface:          '#111827',
 
   // ── Text ───────────────────────────────────────────────────
-  text: '#1A1A2E',
-  textSecondary: '#5C5C7A',
-  textLight: '#9896B0',
-  textWhite: '#FFFFFF',
-  textOrange: '#E8631A',
-  textBlue: '#0099CC',
+  text:             '#F1F5F9',
+  textSecondary:    '#94A3B8',
+  textLight:        '#64748B',
+  textWhite:        '#FFFFFF',
+  textOrange:       '#E8631A',
+  textBlue:         '#3B82F6',
 
-  // ── UI ─────────────────────────────────────────────────────
-  border: '#EDE8E0',
-  borderLight: '#F5F0EA',
-  divider: '#F0EBE3',
+  // ── Borders / dividers ─────────────────────────────────────
+  border:           '#1E2D40',
+  borderLight:      '#1A2535',
+  divider:          '#1E2D40',
 
   // ── Semantic ───────────────────────────────────────────────
-  star: '#FFB800',
-  error: '#EF4444',
-  errorLight: '#FEE2E2',
-  success: '#10B981',
-  successLight: '#D1FAE5',
-  warning: '#FFB800',
-  warningLight: '#FEF3C7',
-  info: '#0099CC',
-  infoLight: '#E0F4FF',
+  star:             '#F59E0B',
+  error:            '#EF4444',
+  errorLight:       'rgba(239,68,68,0.15)',
+  success:          '#10B981',
+  successLight:     'rgba(16,185,129,0.15)',
+  warning:          '#F59E0B',
+  warningLight:     'rgba(245,158,11,0.15)',
+  info:             '#3B82F6',
+  infoLight:        'rgba(59,130,246,0.15)',
 
   // ── Package status ─────────────────────────────────────────
-  statusDraft: '#9896B0',
-  statusDraftBg: '#F5F0EA',
-  statusPending: '#FFB800',
-  statusPendingBg: '#FEF3C7',
-  statusActive: '#10B981',
-  statusActiveBg: '#D1FAE5',
-  statusRejected: '#EF4444',
-  statusRejectedBg: '#FEE2E2',
+  statusDraft:      '#94A3B8',
+  statusDraftBg:    'rgba(148,163,184,0.12)',
+  statusPending:    '#F59E0B',
+  statusPendingBg:  'rgba(245,158,11,0.12)',
+  statusActive:     '#10B981',
+  statusActiveBg:   'rgba(16,185,129,0.12)',
+  statusRejected:   '#EF4444',
+  statusRejectedBg: 'rgba(239,68,68,0.12)',
 
   // ── Booking status ─────────────────────────────────────────
-  bookingPending: '#FFB800',
+  bookingPending:   '#F59E0B',
   bookingConfirmed: '#10B981',
   bookingCancelled: '#EF4444',
-  bookingCompleted: '#0099CC',
+  bookingCompleted: '#3B82F6',
 
-  // ── Shadows ────────────────────────────────────────────────
-  shadowOrange: 'rgba(232,99,26,0.20)',
-  shadowNavy: 'rgba(26,26,46,0.12)',
-  shadowDark: 'rgba(0,0,0,0.08)',
-  overlay: 'rgba(26,26,46,0.50)',
-  overlayLight: 'rgba(26,26,46,0.25)',
+  // ── Shadows / overlays ─────────────────────────────────────
+  shadowOrange:    'rgba(232,99,26,0.20)',
+  shadowNavy:      'rgba(0,0,0,0.30)',
+  shadowDark:      'rgba(0,0,0,0.20)',
+  overlay:         'rgba(0,0,0,0.70)',
+  overlayLight:    'rgba(0,0,0,0.40)',
 
   // ── Tab bar ────────────────────────────────────────────────
-  tabActive: '#E8631A',
-  tabInactive: '#9896B0',
-  tabBackground: '#FFFFFF',
+  tabActive:       '#E8631A',
+  tabInactive:     '#64748B',
+  tabBackground:   '#0D1830',
 
   // ── Compatibility aliases ──────────────────────────────────
-  backgroundBase: '#FFF8F0',
-  backgroundDeep: '#FFF3E8',
-  backgroundLayer1: '#FFFFFF',
-  backgroundLayer2: '#FFF3E8',
-  backgroundLayer3: '#F5F0EA',
-  muted: '#9896B0',
-  white: '#FFFFFF',
-  transparent: 'transparent',
+  backgroundBase:   '#0B1426',
+  backgroundDeep:   '#0D1830',
+  backgroundLayer1: '#111827',
+  backgroundLayer2: '#0D1830',
+  backgroundLayer3: '#1A2535',
+  muted:            '#64748B',
+  white:            '#111827',
+  transparent:      'transparent',
 } as const;
 
 export type ColorKey = keyof typeof Colors;

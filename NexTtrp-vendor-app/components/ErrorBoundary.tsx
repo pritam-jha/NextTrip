@@ -139,7 +139,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#FFF8F0' },
+  safe: { flex: 1, backgroundColor: '#0B1426' },
   container: {
     flexGrow: 1,
     alignItems: 'center',
@@ -151,7 +151,7 @@ const styles = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: '#FEF2F2',
+    backgroundColor: 'rgba(239,68,68,0.12)',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 20,
@@ -160,13 +160,13 @@ const styles = StyleSheet.create({
   heading: {
     fontSize: 22,
     fontWeight: '800',
-    color: '#1A1A2E',
+    color: '#F1F5F9',
     textAlign: 'center',
     marginBottom: 8,
   },
   subheading: {
     fontSize: 14,
-    color: '#5C5C7A',
+    color: '#94A3B8',
     textAlign: 'center',
     lineHeight: 20,
     marginBottom: 24,
@@ -174,9 +174,9 @@ const styles = StyleSheet.create({
   },
   messageBox: {
     width: '100%',
-    backgroundColor: '#FEF2F2',
+    backgroundColor: 'rgba(239,68,68,0.10)',
     borderWidth: 1,
-    borderColor: '#FECACA',
+    borderColor: 'rgba(239,68,68,0.25)',
     borderRadius: 10,
     padding: 14,
     marginBottom: 16,
@@ -184,22 +184,22 @@ const styles = StyleSheet.create({
   messageLabel: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#DC2626',
+    color: '#EF4444',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginBottom: 6,
   },
   messageText: {
     fontSize: 13,
-    color: '#DC2626',
+    color: '#EF4444',
     fontFamily: Platform.select({ ios: 'Menlo', android: 'monospace' }),
     lineHeight: 18,
   },
   stackBox: {
     width: '100%',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#111827',
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: '#1E2D40',
     borderRadius: 8,
     padding: 12,
     marginBottom: 16,
@@ -207,7 +207,7 @@ const styles = StyleSheet.create({
   },
   stackText: {
     fontSize: 10,
-    color: '#6B7280',
+    color: '#64748B',
     fontFamily: Platform.select({ ios: 'Menlo', android: 'monospace' }),
     lineHeight: 15,
   },
@@ -220,7 +220,7 @@ const styles = StyleSheet.create({
   },
   primaryBtnText: { color: '#FFFFFF', fontWeight: '700', fontSize: 15 },
   secondaryBtn: {
-    backgroundColor: '#FEF0E8',
+    backgroundColor: 'rgba(232,99,26,0.12)',
     borderWidth: 1,
     borderColor: '#E8631A',
     borderRadius: 10,
