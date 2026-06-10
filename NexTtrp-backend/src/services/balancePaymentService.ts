@@ -127,7 +127,7 @@ export async function verifyBalancePayment(params: {
   // Confirm booking belongs to this user and has a balance to pay
   const { data: booking, error: bookingErr } = await supabaseAdmin
     .from('bookings')
-    .select('id, user_id, balance_amount, status')
+    .select('id, user_id, balance_amount, total_amount, status')
     .eq('id', params.booking_id)
     .maybeSingle();
 
@@ -141,6 +141,7 @@ export async function verifyBalancePayment(params: {
   }
 
   const balanceAmount = readNumber(row, 'balance_amount');
+  const totalAmount   = readNumber(row, 'total_amount');
   if (balanceAmount <= 0) {
     throw new AppError('Balance already paid', 409);
   }
@@ -167,6 +168,7 @@ export async function verifyBalancePayment(params: {
   const { error: updateErr } = await supabaseAdmin
     .from('bookings')
     .update({
+      advance_amount: totalAmount,
       balance_amount: 0,
       payment_status: 'paid',
       updated_at:     new Date().toISOString(),
