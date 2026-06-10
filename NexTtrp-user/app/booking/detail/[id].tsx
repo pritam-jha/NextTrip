@@ -298,6 +298,100 @@ const reviewStyles = StyleSheet.create({
   },
 });
 
+// ── Pay Balance card ──────────────────────────────────────────────────────────
+
+/**
+ * Shown on confirmed bookings with an outstanding balance. Links to the
+ * pay-balance screen to settle the remaining amount via Razorpay.
+ */
+function PayBalanceCard({ booking }: { booking: Booking }): React.ReactElement | null {
+  if (
+    booking.payment_status === 'paid' ||
+    booking.balance_amount <= 0 ||
+    booking.status !== 'confirmed'
+  ) {
+    return null;
+  }
+
+  const handlePayBalance = (): void => {
+    router.push(`/booking/pay-balance/${booking.id}` as never);
+  };
+
+  return (
+    <View style={payBalanceStyles.card}>
+      <View style={payBalanceStyles.headerRow}>
+        <Ionicons name="wallet-outline" size={20} color={Colors.accent} />
+        <Text style={payBalanceStyles.title}>Balance Due</Text>
+        <Text style={payBalanceStyles.amount}>{formatINR(booking.balance_amount)}</Text>
+      </View>
+      <Text style={payBalanceStyles.subtext}>
+        Due before {formatDate(booking.travel_date, true)}
+      </Text>
+      <Pressable
+        onPress={handlePayBalance}
+        style={({ pressed }) => [
+          payBalanceStyles.button,
+          pressed ? styles.pressed : null,
+        ]}
+        accessibilityRole="button"
+        accessibilityLabel="Pay outstanding balance"
+      >
+        <Text style={payBalanceStyles.buttonText}>Pay Balance Now</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+const payBalanceStyles = StyleSheet.create({
+  card: {
+    backgroundColor: Colors.accentLight,
+    borderColor: Colors.accent + '60',
+    borderRadius: 12,
+    borderWidth: 1.5,
+    marginBottom: 14,
+    padding: 16,
+  },
+  headerRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 4,
+  },
+  title: {
+    color: Colors.textPrimary,
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '900',
+    lineHeight: 20,
+  },
+  amount: {
+    color: Colors.textPrimary,
+    fontSize: 18,
+    fontWeight: '900',
+    lineHeight: 24,
+  },
+  subtext: {
+    color: Colors.textSecondary,
+    fontSize: 12,
+    fontWeight: '700',
+    lineHeight: 17,
+    marginBottom: 14,
+  },
+  button: {
+    alignItems: 'center',
+    backgroundColor: Colors.accent,
+    borderRadius: 10,
+    justifyContent: 'center',
+    paddingVertical: 13,
+  },
+  buttonText: {
+    color: Colors.textPrimary,
+    fontSize: 15,
+    fontWeight: '900',
+    lineHeight: 20,
+  },
+});
+
 // ── Loading / auth states ─────────────────────────────────────────────────────
 
 function LoadingState(): React.ReactElement {
@@ -401,6 +495,7 @@ export default function BookingDetailScreen(): React.ReactElement {
             <TravelInfoCard booking={booking} />
             <TravelerDetailsCard travelers={booking.traveler_details} />
             <PaymentDetailsCard booking={booking} />
+            <PayBalanceCard booking={booking} />
             <BookingTimeline booking={booking} />
             <WriteReviewSection booking={booking} />
             <CancellationCard

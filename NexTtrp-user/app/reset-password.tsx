@@ -56,6 +56,7 @@ export default function ResetPasswordScreen(): React.ReactElement {
   const [exchanging, setExchanging] = useState(true);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
+  const [linkError, setLinkError] = useState('');
 
   const exchangedRef = React.useRef(false);
 
@@ -67,27 +68,27 @@ export default function ResetPasswordScreen(): React.ReactElement {
 
     async function establishRecoverySession(): Promise<void> {
       setExchanging(true);
-      setError('');
+      setLinkError('');
 
       const initialUrl = incomingUrl ?? await Linking.getInitialURL();
       const linkParams = parseRecoveryLink(initialUrl);
       const code = firstSearchParam(params.code) ?? linkParams.code;
       const accessToken = firstSearchParam(params.access_token) ?? linkParams.accessToken;
       const refreshToken = firstSearchParam(params.refresh_token) ?? linkParams.refreshToken;
-      const linkError = firstSearchParam(params.error) ?? linkParams.error;
-      const linkErrorDescription =
+      const urlError = firstSearchParam(params.error) ?? linkParams.error;
+      const urlErrorDescription =
         firstSearchParam(params.error_description) ?? linkParams.errorDescription;
 
       try {
-        if (linkError) {
-          setError(linkErrorDescription ?? linkError);
+        if (urlError) {
+          setLinkError(urlErrorDescription ?? urlError);
           return;
         }
 
         if (code) {
           const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
           if (exchangeError) {
-            setError('Reset link is invalid or has expired. Please request a new one.');
+            setLinkError('Reset link is invalid or has expired. Please request a new one.');
           }
           return;
         }
@@ -98,7 +99,7 @@ export default function ResetPasswordScreen(): React.ReactElement {
             refresh_token: refreshToken,
           });
           if (sessionError) {
-            setError('Reset link is invalid or has expired. Please request a new one.');
+            setLinkError('Reset link is invalid or has expired. Please request a new one.');
           }
           return;
         }
@@ -108,7 +109,7 @@ export default function ResetPasswordScreen(): React.ReactElement {
         } = await supabase.auth.getSession();
 
         if (!session) {
-          setError('Reset link is missing or has expired. Please request a new one.');
+          setLinkError('Reset link is missing or has expired. Please request a new one.');
         }
       } finally {
         if (!cancelled) setExchanging(false);
@@ -161,6 +162,25 @@ export default function ResetPasswordScreen(): React.ReactElement {
         <View style={styles.successBox}>
           <ActivityIndicator size="large" color={Colors.primary} />
           <Text style={{ color: Colors.textSecondary, marginTop: 16, fontSize: 14 }}>Verifying reset link…</Text>
+        </View>
+      </View>
+    );
+  }
+
+  if (linkError) {
+    return (
+      <View style={[styles.root, { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 20 }]}>
+        <View style={styles.successBox}>
+          <Text style={styles.successIcon}>⚠️</Text>
+          <Text style={styles.successTitle}>Link expired</Text>
+          <Text style={styles.successSub}>{linkError}</Text>
+          <Button
+            label="Request new link"
+            onPress={() => router.replace('/(auth)/forgot-password')}
+            fullWidth
+            variant="primary"
+            size="large"
+          />
         </View>
       </View>
     );

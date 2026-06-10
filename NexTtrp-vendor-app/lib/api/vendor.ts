@@ -26,6 +26,8 @@ import type {
   VendorPayout,
   VendorPayoutAccount,
   VendorNotification,
+  EnquirySummary,
+  EnquiryDetail,
   User,
 } from '../../types';
 
@@ -335,6 +337,46 @@ export async function listReviews(params?: {
     '/vendor/reviews',
     params as Record<string, string | number | boolean | null | undefined>,
   );
+  return normalise(res);
+}
+
+// ── Enquiries ─────────────────────────────────────────────────────────────────
+
+/**
+ * Lists enquiry threads started by travelers about the vendor's company.
+ */
+export async function listEnquiries(): Promise<ApiResponse<EnquirySummary[]>> {
+  const res = await apiClient.get<EnquirySummary[]>('/vendor/enquiries');
+  return normalise(res);
+}
+
+/**
+ * Fetches a single enquiry thread with all messages.
+ */
+export async function getEnquiry(enquiryId: string): Promise<ApiResponse<EnquiryDetail>> {
+  const res = await apiClient.get<EnquiryDetail>(`/vendor/enquiries/${enquiryId}`);
+  return normalise(res);
+}
+
+/**
+ * Posts a reply to an enquiry thread.
+ */
+export async function sendEnquiryMessage(
+  enquiryId: string,
+  message: string,
+): Promise<ApiResponse<EnquiryDetail>> {
+  const res = await apiClient.post<EnquiryDetail>(`/vendor/enquiries/${enquiryId}/messages`, { message });
+  return normalise(res);
+}
+
+/**
+ * Marks an enquiry thread as open or closed.
+ */
+export async function setEnquiryStatus(
+  enquiryId: string,
+  status: 'open' | 'closed',
+): Promise<ApiResponse<EnquiryDetail>> {
+  const res = await apiClient.patch<EnquiryDetail>(`/vendor/enquiries/${enquiryId}/status`, { status });
   return normalise(res);
 }
 

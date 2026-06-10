@@ -182,6 +182,13 @@ function DetailContent({ pkg }: { pkg: PackageDetail }): React.ReactElement {
     router.push({ pathname: '/booking/[packageId]' as never, params: { packageId: pkg.id } });
   }, [pkg.id]);
 
+  const handleEnquire = useCallback(() => {
+    router.push({
+      pathname: '/enquiry/new' as never,
+      params: { packageId: pkg.id, packageTitle: pkg.title },
+    });
+  }, [pkg.id, pkg.title]);
+
   const renderTabContent = (): React.ReactElement => {
     if (activeTab === 'itinerary') {
       return (
@@ -377,6 +384,14 @@ function DetailContent({ pkg }: { pkg: PackageDetail }): React.ReactElement {
           <Text style={styles.stickyPrice}>{price !== null ? formatPrice(price) : 'On request'}</Text>
           <Text style={styles.stickyPerPerson}>per person</Text>
         </View>
+        <Pressable
+          style={styles.enquireButton}
+          onPress={handleEnquire}
+          accessibilityRole="button"
+          accessibilityLabel="Enquire about this package"
+        >
+          <Ionicons name="chatbubble-ellipses-outline" size={20} color={Colors.primary} />
+        </Pressable>
         <Button
           label="Compare"
           variant="outline"
@@ -669,6 +684,14 @@ const styles = StyleSheet.create({
   stickyPerPerson: {
     color: Colors.textLight,
     fontSize: 11,
+  },
+  enquireButton: {
+    alignItems: 'center',
+    backgroundColor: Colors.primaryLight,
+    borderRadius: 10,
+    height: 36,
+    justifyContent: 'center',
+    width: 36,
   },
   compareButton: {
     minWidth: 92,

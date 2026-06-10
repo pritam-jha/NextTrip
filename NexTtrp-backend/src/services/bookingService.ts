@@ -526,6 +526,7 @@ export async function confirmMockPayment(
   // NOTE: Replace with Razorpay payment record when integrating
   const { error: paymentError } = await supabaseAdmin.from('payments').insert({
     booking_id: bookingId,
+    user_id: userId,
     amount: amountPaid,
     currency: 'INR',
     payment_method: 'mock',

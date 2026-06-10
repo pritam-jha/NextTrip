@@ -162,6 +162,7 @@ function AppLayout(): React.ReactElement {
         <Stack.Screen name="booking" />
         <Stack.Screen name="review" />
         <Stack.Screen name="compare" />
+        <Stack.Screen name="enquiry" />
         <Stack.Screen name="notifications" />
         <Stack.Screen name="category/[slug]" />
         <Stack.Screen name="account" />

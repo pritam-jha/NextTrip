@@ -169,3 +169,54 @@ export async function cancelBooking(
   }
   return { data: response.data, error: null };
 }
+
+export interface BalanceOrderResult {
+  order_id:   string;
+  amount:     number; // in paise
+  currency:   string;
+  key_id:     string;
+  booking_id: string;
+}
+
+export interface BalanceVerifyResult {
+  booking_id: string;
+  payment_id: string;
+  status:     string;
+}
+
+/** Creates a Razorpay order for the outstanding balance. */
+export async function createBalanceOrder(
+  bookingId: string,
+): Promise<ApiResponse<BalanceOrderResult>> {
+  const response = await apiClient.post<BalanceOrderResult>(
+    `/bookings/${encodeURIComponent(bookingId)}/create-balance-order`,
+    {},
+    true,
+  );
+  if (response.error || !response.data) {
+    return { data: null, error: response.error ?? 'Could not initiate balance payment.' };
+  }
+  return { data: response.data, error: null };
+}
+
+/** Verifies Razorpay signature and marks the balance as paid. */
+export async function verifyBalancePayment(params: {
+  booking_id:          string;
+  razorpay_order_id:   string;
+  razorpay_payment_id: string;
+  razorpay_signature:  string;
+}): Promise<ApiResponse<BalanceVerifyResult>> {
+  const response = await apiClient.post<BalanceVerifyResult>(
+    `/bookings/${encodeURIComponent(params.booking_id)}/verify-balance-payment`,
+    {
+      razorpay_order_id:   params.razorpay_order_id,
+      razorpay_payment_id: params.razorpay_payment_id,
+      razorpay_signature:  params.razorpay_signature,
+    },
+    true,
+  );
+  if (response.error || !response.data) {
+    return { data: null, error: response.error ?? 'Balance payment verification failed.' };
+  }
+  return { data: response.data, error: null };
+}

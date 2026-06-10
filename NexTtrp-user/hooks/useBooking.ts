@@ -155,7 +155,7 @@ export function useCreateBooking(): UseMutationResult<
         queryKey: bookingQueryKeys.list(),
       });
 
-      router.push({
+      router.replace({
         pathname: '/booking/payment' as never,
         params: { bookingId: data.booking.id },
       });

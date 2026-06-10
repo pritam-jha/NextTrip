@@ -248,7 +248,8 @@ export default function ProfileScreen(): React.ReactElement {
 
               <MenuSection label="GENERAL">
                 <MenuItem icon="person-outline" label="My Profile" onPress={handleEnterEdit} />
-                <MenuItem icon="notifications-outline" label="Notifications" onPress={() => router.push('/notifications' as never)} isLast />
+                <MenuItem icon="notifications-outline" label="Notifications" onPress={() => router.push('/notifications' as never)} />
+                <MenuItem icon="chatbubbles-outline" label="My Enquiries" onPress={() => router.push('/enquiry' as never)} isLast />
               </MenuSection>
 
               <MenuSection label="TRIPS">

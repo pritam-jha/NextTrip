@@ -8,7 +8,6 @@ import React, {
   useCallback,
   useEffect,
   useRef,
-  useState,
 } from 'react';
 import {
   Animated,
@@ -32,7 +31,6 @@ import { useAmenitiesData } from '../components/compare/AmenitiesRow';
 import { HighlightsCells } from '../components/compare/HighlightsRow';
 import { EmptyCompare } from '../components/compare/EmptyCompare';
 import { COLUMN_WIDTH, COLUMN_GAP } from '../components/compare/AddPackageSlot';
-import { Toast } from '../components/ui/Toast';
 import { useCompareScreen } from '../hooks/useCompareScreen';
 import { useCompareStore as useRawCompareStore } from '../store/compareStore';
 import { Colors } from '../constants/colors';
@@ -261,7 +259,7 @@ function ActionCells({
   onEnquire,
 }: {
   packages: PackageListItem[];
-  onEnquire: () => void;
+  onEnquire: (pkg: PackageListItem) => void;
 }): React.ReactElement {
   return (
     <View style={[aSt.row, { height: ROW_HEIGHTS.actions }]}>
@@ -277,7 +275,7 @@ function ActionCells({
           </Pressable>
           <Pressable
             style={aSt.enquireBtn}
-            onPress={onEnquire}
+            onPress={() => onEnquire(pkg)}
             accessibilityRole="button"
             accessibilityLabel="Enquire"
           >
@@ -319,9 +317,6 @@ export default function CompareScreen(): React.ReactElement {
     isLoading,
   } = useCompareScreen();
 
-  const [toastVisible, setToastVisible] = useState(false);
-  const [toastMessage, setToastMessage] = useState('');
-
   const amenitiesData = useAmenitiesData(packages);
   const headerScrollRef = useRef<SV>(null);
   const bodyScrollRef = useRef<SV>(null);
@@ -351,12 +346,12 @@ export default function CompareScreen(): React.ReactElement {
     setTimeout(() => { isSyncingV.current = false; }, 50);
   }, []);
 
-  const handleEnquire = useCallback(() => {
-    setToastMessage('Enquiry feature coming soon.');
-    setToastVisible(true);
+  const handleEnquire = useCallback((pkg: PackageListItem) => {
+    router.push({
+      pathname: '/enquiry/new' as never,
+      params: { packageId: pkg.id, packageTitle: pkg.title },
+    });
   }, []);
-
-  const hideToast = useCallback(() => setToastVisible(false), []);
 
   if (compareItems.length === 0) {
     return (
@@ -535,13 +530,6 @@ export default function CompareScreen(): React.ReactElement {
           </ScrollView>
         </ScrollView>
       </View>
-
-      <Toast
-        visible={toastVisible}
-        message={toastMessage}
-        type="info"
-        onHide={hideToast}
-      />
     </SafeAreaView>
   );
 }

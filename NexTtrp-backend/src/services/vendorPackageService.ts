@@ -148,7 +148,7 @@ const throwDb = (op: string, err: unknown): never => {
  * Resolves the company ID for the given owner and returns it.
  * Throws 404 if no company exists for this owner.
  */
-async function resolveCompanyId(ownerId: string): Promise<string> {
+export async function resolveCompanyId(ownerId: string): Promise<string> {
   const { data, error } = await supabaseAdmin
     .from('companies')
     .select('id')
@@ -1133,7 +1133,7 @@ export async function updateVendorBookingStatus(
   // Verify booking belongs to this company
   const { data: existing, error: fetchErr } = await supabaseAdmin
     .from('bookings')
-    .select('id, status, company_id')
+    .select('id, status, company_id, travel_date')
     .eq('id', bookingId)
     .eq('company_id', companyId)
     .maybeSingle();
@@ -1150,6 +1150,18 @@ export async function updateVendorBookingStatus(
   }
   if (currentStatus === 'completed') {
     throw new AppError('Completed bookings cannot be updated.', 409);
+  }
+
+  const travelDate = readString(existingRow, 'travel_date');
+  if (
+    status === 'completed' &&
+    travelDate !== '' &&
+    new Date(`${travelDate}T23:59:59Z`) > new Date()
+  ) {
+    throw new AppError(
+      'Cannot mark a booking as completed before the travel date.',
+      400
+    );
   }
 
   // booking_status_events table not yet in schema — skip event recording for now.

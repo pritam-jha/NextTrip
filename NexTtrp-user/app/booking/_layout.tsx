@@ -15,6 +15,7 @@ export default function BookingLayout(): React.ReactElement {
       <Stack.Screen name="summary" />
       <Stack.Screen name="payment" />
       <Stack.Screen name="detail/[id]" />
+      <Stack.Screen name="pay-balance/[id]" />
       <Stack.Screen
         name="confirmation"
         options={{

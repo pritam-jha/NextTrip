@@ -25,6 +25,10 @@
  *  PATCH              /bookings/:id/status
  *
  *  GET                /reviews
+ *  GET                /enquiries
+ *  GET                /enquiries/:id
+ *  POST               /enquiries/:id/messages
+ *  PATCH              /enquiries/:id/status
  *  GET                /payouts
  *  GET/POST           /payout-accounts
  *  GET                /notifications
@@ -70,6 +74,12 @@ import {
   updateVendorBookingStatus,
 } from '../services/vendorPackageService';
 import { getVendorAnalytics } from '../services/analyticsService';
+import {
+  getVendorEnquiries,
+  getVendorEnquiryDetail,
+  addVendorMessage,
+  setVendorEnquiryStatus,
+} from '../services/enquiryService';
 import { success, notFound, validationError } from '../utils/response';
 import { AppError } from '../constants/errors';
 import {
@@ -89,6 +99,8 @@ import {
   CreatePayoutAccountSchema,
   VendorListNotificationsQuerySchema,
 } from '../utils/vendorValidation';
+import { EnquiryMessageSchema } from '../utils/validation';
+import { z } from 'zod';
 
 export const vendorRouter = Router();
 
@@ -529,6 +541,75 @@ vendorRouter.get('/reviews', async (req, res, next) => {
     return success(res, result);
   } catch (err) {
     if (err instanceof AppError && err.statusCode === 404) return notFound(res, 'Company');
+    return next(err);
+  }
+});
+
+// ── Enquiries ─────────────────────────────────────────────────────────────────
+
+const VendorEnquiryStatusSchema = z.object({ status: z.enum(['open', 'closed']) }).strict();
+
+/**
+ * GET /api/v1/vendor/enquiries
+ * Returns enquiry threads addressed to the vendor's company.
+ */
+vendorRouter.get('/enquiries', async (req, res, next) => {
+  try {
+    const enquiries = await getVendorEnquiries(req.user!.id);
+    return success(res, enquiries);
+  } catch (err) {
+    if (err instanceof AppError && err.statusCode === 404) return notFound(res, 'Company');
+    return next(err);
+  }
+});
+
+/**
+ * GET /api/v1/vendor/enquiries/:id
+ * Returns a single enquiry thread with all messages.
+ */
+vendorRouter.get('/enquiries/:id', async (req, res, next) => {
+  try {
+    const { id } = VendorUuidParamSchema.parse(req.params);
+    const enquiry = await getVendorEnquiryDetail(req.user!.id, id);
+    return success(res, enquiry);
+  } catch (err) {
+    if (err instanceof AppError && err.statusCode === 404) return notFound(res, 'Enquiry');
+    return next(err);
+  }
+});
+
+/**
+ * POST /api/v1/vendor/enquiries/:id/messages
+ * Posts a reply to an enquiry thread.
+ */
+vendorRouter.post('/enquiries/:id/messages', strictLimiter, async (req, res, next) => {
+  try {
+    const { id } = VendorUuidParamSchema.parse(req.params);
+    const parsed = EnquiryMessageSchema.safeParse(req.body);
+    if (!parsed.success) return validationError(res, parsed.error.flatten().fieldErrors);
+
+    const enquiry = await addVendorMessage(req.user!.id, id, parsed.data.message);
+    return success(res, enquiry);
+  } catch (err) {
+    if (err instanceof AppError && err.statusCode === 404) return notFound(res, 'Enquiry');
+    return next(err);
+  }
+});
+
+/**
+ * PATCH /api/v1/vendor/enquiries/:id/status
+ * Marks an enquiry thread as open or closed.
+ */
+vendorRouter.patch('/enquiries/:id/status', strictLimiter, async (req, res, next) => {
+  try {
+    const { id } = VendorUuidParamSchema.parse(req.params);
+    const parsed = VendorEnquiryStatusSchema.safeParse(req.body);
+    if (!parsed.success) return validationError(res, parsed.error.flatten().fieldErrors);
+
+    const enquiry = await setVendorEnquiryStatus(req.user!.id, id, parsed.data.status);
+    return success(res, enquiry);
+  } catch (err) {
+    if (err instanceof AppError && err.statusCode === 404) return notFound(res, 'Enquiry');
     return next(err);
   }
 });

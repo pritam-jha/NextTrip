@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStore } from '../../store/authStore';
 import { useVendorCompany } from '../../hooks/useVendorCompany';
 import { useUnreadNotificationCount } from '../../hooks/useVendorNotifications';
+import { useUnreadEnquiryCount } from '../../hooks/useVendorEnquiries';
 import { signOut } from '../../lib/api/auth';
 import { Colors } from '../../constants/colors';
 import { Shadows } from '../../constants/shadows';
@@ -94,6 +95,7 @@ export default function AccountScreen(): React.ReactElement {
   const user = useAuthStore((s) => s.user);
   const { data: company } = useVendorCompany();
   const unreadCount = useUnreadNotificationCount();
+  const unreadEnquiryCount = useUnreadEnquiryCount();
 
   const handleSignOut = (): void => {
     Alert.alert(
@@ -183,6 +185,16 @@ export default function AccountScreen(): React.ReactElement {
           onPress={() => router.push({ pathname: '/(vendor)/analytics', params: { from: 'account' } })}
           iconColor={Colors.secondary}
           iconBg={Colors.secondaryLight}
+        />
+        <View style={styles.separator} />
+        <MenuRow
+          icon="chatbubbles-outline"
+          label="Enquiries"
+          subtitle="Reply to traveler questions"
+          badge={unreadEnquiryCount}
+          onPress={() => router.push({ pathname: '/(vendor)/enquiries', params: { from: 'account' } })}
+          iconColor={Colors.info}
+          iconBg={Colors.infoLight}
         />
         <View style={styles.separator} />
         <MenuRow

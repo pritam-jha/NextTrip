@@ -286,6 +286,9 @@ create table public.bookings (
   payment_status public.payment_status not null default 'pending',
   special_requests text,
   traveler_details jsonb not null default '[]'::jsonb,
+  payment_type    text not null default 'full'
+                  check (payment_type in ('full', 'advance')),
+  primary_contact jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint bookings_amounts_check check (advance_amount + balance_amount = total_amount),

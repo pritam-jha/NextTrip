@@ -439,3 +439,45 @@ export interface ReviewEligibility {
   can_review: boolean;
   booking_id?: string;
 }
+
+// ── Enquiries ────────────────────────────────────────────────────────────────
+
+/**
+ * A single message within an enquiry thread.
+ */
+export interface EnquiryMessage {
+  id: string;
+  sender_role: 'user' | 'vendor';
+  message: string;
+  created_at: string;
+}
+
+/**
+ * Enquiry thread summary, as returned in list views.
+ */
+export interface EnquirySummary {
+  id: string;
+  package: { id: string; title: string } | null;
+  company: { id: string; name: string };
+  subject: string;
+  status: 'open' | 'closed';
+  last_message_preview: string | null;
+  last_message_at: string;
+  unread_count: number;
+  created_at: string;
+}
+
+/**
+ * Full enquiry thread including all messages, oldest first.
+ */
+export interface EnquiryDetail extends EnquirySummary {
+  messages: EnquiryMessage[];
+}
+
+/**
+ * Body for POST /api/v1/enquiries.
+ */
+export interface CreateEnquiryInput {
+  package_id: string;
+  message: string;
+}

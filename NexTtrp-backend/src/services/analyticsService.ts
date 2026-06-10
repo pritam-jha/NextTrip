@@ -74,7 +74,7 @@ export async function getVendorAnalytics(companyId: string): Promise<VendorAnaly
   // Monthly revenue + bookings for this vendor
   const { data: bookingsData, error: bookingsErr } = await supabaseAdmin
     .from('bookings')
-    .select('id, total_amount, status, created_at, package_id, packages!inner(company_id)')
+    .select('id, total_amount, advance_amount, status, created_at, package_id, packages!inner(company_id)')
     .eq('packages.company_id', companyId)
     .gte('created_at', `${since}-01`)
     .order('created_at', { ascending: true });
@@ -90,7 +90,7 @@ export async function getVendorAnalytics(companyId: string): Promise<VendorAnaly
 
   rows.forEach((row) => {
     const month = String(row['created_at']).slice(0, 7);
-    const amount = typeof row['total_amount'] === 'number' ? row['total_amount'] : 0;
+    const amount = typeof row['advance_amount'] === 'number' ? row['advance_amount'] : 0;
     const status = String(row['status']);
 
     if (!monthMap.has(month)) monthMap.set(month, { revenue: 0, bookings: 0 });
@@ -153,7 +153,7 @@ export async function getAdminAnalytics(): Promise<AdminAnalytics> {
   const [bookingsRes, usersRes, companiesRes, _categoriesRes] = await Promise.all([
     supabaseAdmin
       .from('bookings')
-      .select('id, total_amount, status, created_at')
+      .select('id, total_amount, advance_amount, status, created_at')
       .gte('created_at', `${since}-01`),
     supabaseAdmin
       .from('users')
@@ -182,7 +182,7 @@ export async function getAdminAnalytics(): Promise<AdminAnalytics> {
 
   bookings.forEach((b) => {
     const month = String(b['created_at']).slice(0, 7);
-    const amount = typeof b['total_amount'] === 'number' ? b['total_amount'] : 0;
+    const amount = typeof b['advance_amount'] === 'number' ? b['advance_amount'] : 0;
     const status = String(b['status']) as keyof typeof funnelCounts;
 
     if (!revenueMap.has(month)) revenueMap.set(month, { revenue: 0, bookings: 0 });

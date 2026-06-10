@@ -191,3 +191,23 @@ export type PackageImageSaveInput = z.infer<typeof PackageImageSaveSchema>;
  * Profile update input after validation and normalization.
  */
 export type UpdateProfileInput = z.infer<typeof UpdateProfileSchema>;
+
+/**
+ * Validates the body for POST /api/v1/enquiries.
+ */
+export const CreateEnquirySchema = z
+  .object({
+    package_id: z.string().uuid(),
+    message: z.string().trim().min(1).max(2000),
+  })
+  .strict();
+
+/**
+ * Validates the body for posting a follow-up message to an enquiry thread,
+ * from either the traveler or vendor side.
+ */
+export const EnquiryMessageSchema = z
+  .object({
+    message: z.string().trim().min(1).max(2000),
+  })
+  .strict();
