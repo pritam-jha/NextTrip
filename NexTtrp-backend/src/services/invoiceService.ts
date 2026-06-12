@@ -266,7 +266,7 @@ async function renderInvoicePdf(data: InvoicePdfData): Promise<Buffer> {
         align: 'right',
       });
 
-      doc.font('Helvetica').fontSize(9).fillColor(COLOR_MUTED).text(`GSTIN: ${PLATFORM_GSTIN}`, left, doc.y, {
+      doc.font('Helvetica').fontSize(9).fillColor(COLOR_MUTED).text(`GSTIN: ${PLATFORM_GSTIN}   PAN: ${PLATFORM_PAN}`, left, doc.y, {
         continued: true,
       });
       doc.text(`   Invoice Date: ${data.invoiceDate}`, { align: 'right' });
