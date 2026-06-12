@@ -211,3 +211,23 @@ export const EnquiryMessageSchema = z
     message: z.string().trim().min(1).max(2000),
   })
   .strict();
+
+/**
+ * Validates the body for POST /api/v1/chat.
+ * `history` is capped at 20 turns — enough for multi-turn context without
+ * letting a client blow past the Gemini free-tier token budget.
+ */
+export const ChatRequestSchema = z
+  .object({
+    message: z.string().trim().min(1, 'Message cannot be empty').max(2000),
+    history: z
+      .array(
+        z.object({
+          role: z.enum(['user', 'assistant']),
+          content: z.string().trim().min(1).max(2000),
+        }),
+      )
+      .max(20)
+      .optional(),
+  })
+  .strict();

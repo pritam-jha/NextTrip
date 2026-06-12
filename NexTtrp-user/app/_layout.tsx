@@ -174,6 +174,7 @@ function AppLayout(): React.ReactElement {
         <Stack.Screen name="compare" />
         <Stack.Screen name="enquiry" />
         <Stack.Screen name="notifications" />
+        <Stack.Screen name="chat" />
         <Stack.Screen name="category/[slug]" />
         <Stack.Screen name="account" />
       </Stack>

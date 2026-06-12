@@ -406,6 +406,15 @@ export default function HomeScreen(): React.ReactElement {
 
         </ScrollView>
       </Animated.View>
+
+      <Pressable
+        style={({ pressed }) => [styles.chatFab, pressed ? styles.chatFabPressed : null]}
+        onPress={() => router.push('/chat' as never)}
+        accessibilityRole="button"
+        accessibilityLabel="Open travel assistant chat"
+      >
+        <Ionicons name="chatbubble-ellipses" size={24} color={Colors.textWhite} />
+      </Pressable>
     </View>
   );
 }
@@ -426,6 +435,25 @@ const styles = StyleSheet.create({
   root: {
     backgroundColor: Colors.background,
     flex: 1,
+  },
+  chatFab: {
+    position: 'absolute',
+    right: 20,
+    bottom: 24,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: Colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: Colors.shadowOrange,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 6,
+  },
+  chatFabPressed: {
+    opacity: 0.85,
   },
   hero: {
     backgroundColor: Colors.background,

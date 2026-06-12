@@ -52,3 +52,13 @@ export const readLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
   limit: 120,
 });
+
+/**
+ * Limiter for the AI chat endpoint — keeps usage within the Gemini free-tier
+ * quota and prevents a single client from exhausting it.
+ */
+export const chatLimiter = rateLimit({
+  ...baseOptions,
+  windowMs: 60 * 1000, // 1 minute
+  limit: 15,
+});
